@@ -179,7 +179,7 @@ export function FinderEditorPage() {
   return (
     <div className="pb-24">
       <Tabs value={tab} onValueChange={(value) => setTab(value as TabKey)}>
-        <div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 px-4 py-3 backdrop-blur md:px-6">
+        <div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 px-3 py-3 backdrop-blur">
           <PageHeader
             title={
               <div className="flex min-w-0 items-center gap-2">
@@ -198,7 +198,13 @@ export function FinderEditorPage() {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setQrTarget({ code: detail.finder.code, title: detail.finder.title, scanUrl: detail.scanUrl, active })
+                    setQrTarget({
+                      id: detail.finder.id,
+                      code: detail.finder.code,
+                      title: detail.finder.title,
+                      scanUrl: detail.scanUrl,
+                      active,
+                    })
                   }
                 >
                   <QrCode /> 二维码
@@ -232,7 +238,7 @@ export function FinderEditorPage() {
             </TabsList>
           </div>
         </div>
-        <div className="p-4 md:p-6">
+        <div className="p-3">
           <TabsContent value="basic" className="mt-0">
             <BasicSection {...sectionProps} scanUrl={detail.scanUrl} />
           </TabsContent>
@@ -256,7 +262,7 @@ export function FinderEditorPage() {
 
       {readOnly ? null : (
         <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur md:left-60">
-          <div className="flex items-center justify-between gap-2 px-4 py-3 md:px-6">
+          <div className="flex items-center justify-between gap-2 px-3 py-3">
             <p className={cn('text-sm', dirty ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
               {dirty ? '有未保存的修改' : '所有修改已保存'}
             </p>

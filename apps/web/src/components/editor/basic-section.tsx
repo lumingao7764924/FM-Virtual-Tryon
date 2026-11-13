@@ -6,7 +6,7 @@ import { Field, Section, errorAt, type SectionProps } from './shared';
 export function BasicSection({ draft, update, errors, readOnly, scanUrl }: SectionProps & { scanUrl: string }) {
   return (
     <Section title="基本信息" description="名称和品牌用于后台识别，页面标题用产品名称。不显示价格。">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         <Field label="产品名称" htmlFor="f-title" error={errorAt(errors, 'title')}>
           <Input
             id="f-title"

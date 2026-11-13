@@ -35,12 +35,12 @@ function autoTone(hex: string): Undertone | null {
   return normalized ? resolveVariantUndertone({ id: '', hex: normalized }, hexToLab(normalized)) : null;
 }
 
-function blankVariant(index: number): FinderVariant {
+function blankVariant(): FinderVariant {
   return {
     id: newLocalId('v'),
-    name: `Shade ${index + 1}`,
+    name: '',
     sku: '',
-    hex: '#E0B898',
+    hex: '',
     undertone: 'auto',
     enabled: true,
     links: {},
@@ -122,7 +122,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
             <Button
               size="sm"
               disabled={variants.length >= MAX_VARIANTS}
-              onClick={() => update((d) => void d.variants.push(blankVariant(d.variants.length)))}
+              onClick={() => update((d) => void d.variants.push(blankVariant()))}
             >
               <Plus /> 添加色号
             </Button>
@@ -131,7 +131,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
       }
     >
       {errorAt(errors, 'variants') ? <p className="text-sm text-destructive">{errorAt(errors, 'variants')}</p> : null}
-      <div className="overflow-x-auto rounded-md border">
+      <div className="overflow-x-auto border">
         <Table>
           <TableHeader>
             <TableRow>

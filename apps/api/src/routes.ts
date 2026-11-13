@@ -139,6 +139,15 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
     return { items: await finders.history(request.params.id) };
   });
 
+  app.post<IdParams>('/api/finders/:id/preview', async (request) => {
+    await requireUser(request, users);
+    const issued = await finders.issuePreview(request.params.id);
+    return {
+      url: `${scanUrl(issued.code)}?pv=${encodeURIComponent(issued.token)}`,
+      expiresAt: issued.expiresAt,
+    };
+  });
+
   app.get<{ Params: { id: string; version: string } }>('/api/finders/:id/versions/:version', async (request) => {
     await requireUser(request, users);
     return { finder: await finders.getVersion(request.params.id, Number(request.params.version)) };
@@ -150,6 +159,7 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
     return stats.forFinder(finder, {
       from: queryString(request, 'from'),
       to: queryString(request, 'to'),
+      days: queryString(request, 'days'),
       channel: queryString(request, 'channel'),
     });
   });
@@ -189,6 +199,11 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
     '/api/public/finders/:code',
     { config: { rateLimit: { max: 300, timeWindow: '1 minute' } } },
     async (request, reply) => {
+      const preview = queryString(request, 'pv');
+      if (preview) {
+        reply.header('Cache-Control', 'private, no-store');
+        return finders.getPreview(request.params.code, preview);
+      }
       reply.header('Cache-Control', 'public, max-age=60');
       return finders.getPublic(request.params.code);
     }

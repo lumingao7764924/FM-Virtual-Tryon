@@ -27,7 +27,20 @@ const FUNNEL: Omit<FunnelStep, 'sessions'>[] = [
 export interface StatsQuery {
   from: string;
   to: string;
+  /** 含当天在内往前推的天数。0 = 仅当天。有值时忽略 from/to。 */
+  days: string;
   channel: string;
+}
+
+export function serverToday(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+export function shiftDate(ymd: string, days: number): string {
+  const [year, month, day] = ymd.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function parseRecommended(raw: string | null): RecommendedSlot[] {
@@ -192,6 +205,7 @@ export function aggregateStats(finder: Finder, allRows: EventRow[], query: Stats
   }
 
   return {
+    today: '',
     from: query.from,
     to: query.to,
     channels,
@@ -226,7 +240,21 @@ export class StatsService {
   constructor(private readonly repo: EventRepo) {}
 
   async forFinder(finder: Finder, query: StatsQuery): Promise<FinderStats> {
-    validateStatsRange(query.from, query.to);
-    return aggregateStats(finder, await this.repo.query(finder.id, query.from, query.to), query);
+    const today = serverToday();
+    let from = query.from;
+    let to = query.to;
+    const days = query.days === '' ? NaN : Number(query.days);
+    if (query.days !== '') {
+      if (!Number.isInteger(days) || days < 0 || days > STATS_MAX_DAYS) throw badRequest('日期范围无效');
+      to = today;
+      from = shiftDate(today, -days);
+    } else if (!from && !to) {
+      to = today;
+      from = shiftDate(today, -6);
+    }
+    validateStatsRange(from, to);
+    if (from > today || to > today) throw badRequest('不能查询服务器当天之后的日期');
+    const stats = aggregateStats(finder, await this.repo.query(finder.id, from, to), { ...query, from, to });
+    return { ...stats, today };
   }
 }

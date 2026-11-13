@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Pencil, RefreshCw } from 'lucide-react';
-import type { FinderStats } from '@tryon/shared';
+import { ArrowLeft, CalendarRange, ChevronLeft, ChevronRight, Download, Pencil, RefreshCw } from 'lucide-react';
+import { STATS_MAX_DAYS, type DailyStat, type FinderStats } from '@tryon/shared';
 import { apiFetch, errorMessage } from '@/api';
 import { InfoHint } from '@/components/info-hint';
 import { PageHeader } from '@/components/page-header';
@@ -11,10 +11,12 @@ import { toast } from '@/components/toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { downloadText, type FinderDetail } from '@/lib/finders';
-import { daysAgo, formatNumber, formatPercent, ymd } from '@/lib/format';
+import { formatNumber, formatPercent } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 const RANGES = [
   { value: '0', label: '今天' },
@@ -23,6 +25,147 @@ const RANGES = [
   { value: '89', label: '近 90 天' },
   { value: '364', label: '近一年' },
 ];
+
+type RangeQuery = { kind: 'days'; days: string } | { kind: 'custom'; from: string; to: string };
+
+function shiftDate(ymd: string, days: number): string {
+  const [year, month, day] = ymd.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function monthOf(ymd: string): string {
+  return ymd.slice(0, 7);
+}
+
+function shiftMonth(month: string, delta: number): string {
+  const [year, mon] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, mon - 1 + delta, 1));
+  return date.toISOString().slice(0, 7);
+}
+
+function monthCells(month: string): { date: string; inMonth: boolean }[] {
+  const [year, mon] = month.split('-').map(Number);
+  const first = new Date(Date.UTC(year, mon - 1, 1));
+  const lead = (first.getUTCDay() + 6) % 7;
+  const start = new Date(first);
+  start.setUTCDate(1 - lead);
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    const ymd = date.toISOString().slice(0, 10);
+    return { date: ymd, inMonth: ymd.startsWith(month) };
+  });
+}
+
+function RangePicker({
+  from,
+  to,
+  today,
+  disabled,
+  onChange,
+}: {
+  from: string;
+  to: string;
+  today: string;
+  disabled?: boolean;
+  onChange: (from: string, to: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [cursor, setCursor] = useState(monthOf(to || today));
+  const [start, setStart] = useState<string | null>(null);
+  const earliest = shiftDate(today, -STATS_MAX_DAYS);
+  const cells = monthCells(cursor);
+  const week = ['一', '二', '三', '四', '五', '六', '日'];
+
+  function pick(date: string) {
+    if (date > today || date < earliest) return;
+    if (!start || (start && date === start)) {
+      setStart(date);
+      return;
+    }
+    const nextFrom = date < start ? date : start;
+    const nextTo = date < start ? start : date;
+    if (nextFrom < shiftDate(nextTo, -STATS_MAX_DAYS)) return;
+    setStart(null);
+    setOpen(false);
+    onChange(nextFrom, nextTo);
+  }
+
+  const previewFrom = start ?? from;
+  const previewTo = start ? start : to;
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) {
+          setStart(null);
+          setCursor(monthOf(to || today));
+        }
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-8 w-56 justify-start px-2.5 font-normal" disabled={disabled}>
+          <CalendarRange />
+          {from} 至 {to}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-3" align="start">
+        <div className="mb-2 flex items-center justify-between">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setCursor(shiftMonth(cursor, -1))} aria-label="上个月">
+            <ChevronLeft />
+          </Button>
+          <span className="text-sm font-medium">{cursor.replace('-', '年')}月</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            disabled={cursor >= monthOf(today)}
+            onClick={() => setCursor(shiftMonth(cursor, 1))}
+            aria-label="下个月"
+          >
+            <ChevronRight />
+          </Button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+          {week.map((day) => (
+            <span key={day} className="flex h-7 w-10 items-center justify-center">
+              {day}
+            </span>
+          ))}
+        </div>
+        <div className="mt-1 grid grid-cols-7 gap-1">
+          {cells.map((cell) => {
+            const blocked = cell.date > today || cell.date < earliest;
+            const inRange = cell.date >= previewFrom && cell.date <= previewTo;
+            const edge = cell.date === previewFrom || cell.date === previewTo;
+            return (
+              <button
+                key={cell.date}
+                type="button"
+                disabled={blocked}
+                onClick={() => pick(cell.date)}
+                className={cn(
+                  'h-10 w-10 rounded-md text-sm',
+                  !cell.inMonth && 'text-muted-foreground/50',
+                  inRange && !edge && 'bg-primary/10',
+                  edge && 'bg-primary text-primary-foreground',
+                  blocked && 'cursor-not-allowed opacity-30',
+                )}
+              >
+                {Number(cell.date.slice(8))}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{start ? '再点一天作为结束' : '先点开始日期，再点结束日期'}</p>
+      </PopoverContent>
+    </Popover>
+  );
+}
 const ALL = '__all__';
 
 const LABELS: Record<string, string> = {
@@ -72,12 +215,90 @@ function shadesCsv(stats: FinderStats): string {
   return `\uFEFF${[header, ...rows].map((row) => row.map(escape).join(',')).join('\n')}`;
 }
 
+function DailyLine({ days }: { days: DailyStat[] }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [width, setWidth] = useState(0);
+  const height = 200;
+  const pad = { l: 36, r: 12, t: 16, b: 28 };
+
+  useEffect(() => {
+    const node = box.current;
+    if (!node) return;
+    const measure = () => setWidth(node.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const max = Math.max(1, ...days.map((day) => day.sessions));
+  const plotW = width - pad.l - pad.r;
+  const plotH = height - pad.t - pad.b;
+  const xAt = (index: number) => pad.l + (days.length <= 1 ? plotW / 2 : (index / (days.length - 1)) * plotW);
+  const yAt = (value: number) => pad.t + (1 - value / max) * plotH;
+  const line = days.map((day, index) => `${index ? 'L' : 'M'}${xAt(index).toFixed(1)},${yAt(day.sessions).toFixed(1)}`).join(' ');
+  const labelEvery = Math.max(1, Math.ceil(days.length / 7));
+  const active = hover === null ? null : days[hover];
+
+  return (
+    <div ref={box} className="relative w-full">
+      {width > 0 ? (
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block w-full" role="img" aria-label="每日打开次数">
+        {[0, max].map((tick) => (
+          <g key={tick}>
+            <line x1={pad.l} x2={width - pad.r} y1={yAt(tick)} y2={yAt(tick)} className="stroke-border" strokeWidth="1" />
+            <text x={pad.l - 6} y={yAt(tick) + 4} textAnchor="end" className="fill-muted-foreground text-[11px]">
+              {tick}
+            </text>
+          </g>
+        ))}
+        <path d={line} fill="none" className="stroke-primary" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        {days.map((day, index) => (
+          <g key={day.date}>
+            <circle cx={xAt(index)} cy={yAt(day.sessions)} r={hover === index ? 4 : 2.5} className="fill-primary" />
+            <rect
+              x={xAt(index) - plotW / Math.max(days.length, 1) / 2}
+              y={pad.t}
+              width={plotW / Math.max(days.length, 1)}
+              height={plotH}
+              fill="transparent"
+              onMouseEnter={() => setHover(index)}
+              onMouseLeave={() => setHover(null)}
+            >
+              <title>{`${day.date} 打开 ${day.sessions}`}</title>
+            </rect>
+            {index % labelEvery === 0 || index === days.length - 1 ? (
+              <text x={xAt(index)} y={height - 8} textAnchor="middle" className="fill-muted-foreground text-[11px]">
+                {day.date.slice(5)}
+              </text>
+            ) : null}
+          </g>
+        ))}
+      </svg>
+      ) : (
+        <div className="h-[200px]" />
+      )}
+      {active && hover !== null ? (
+        <p
+          className="pointer-events-none absolute top-0 rounded border bg-background px-2 py-1 text-xs shadow-sm"
+          style={{ left: `${(xAt(hover) / width) * 100}%`, transform: 'translateX(-50%)' }}
+        >
+          {active.date} · 打开 {formatNumber(active.sessions)}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function FinderAnalyticsPage() {
   const { id = '' } = useParams();
   const nav = useNavigate();
   const [detail, setDetail] = useState<FinderDetail | null>(null);
   const [stats, setStats] = useState<FinderStats | null>(null);
-  const [range, setRange] = useState('29');
+  const [query, setQuery] = useState<RangeQuery>({ kind: 'days', days: '6' });
+  const [today, setToday] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
   const [channel, setChannel] = useState(ALL);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -91,16 +312,25 @@ export function FinderAnalyticsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ from: daysAgo(Number(range)), to: ymd(new Date()) });
+      const params = new URLSearchParams();
+      if (query.kind === 'days') params.set('days', query.days);
+      else {
+        params.set('from', query.from);
+        params.set('to', query.to);
+      }
       if (channel !== ALL) params.set('channel', channel);
-      setStats(await apiFetch<FinderStats>(`/api/finders/${id}/stats?${params}`));
+      const next = await apiFetch<FinderStats>(`/api/finders/${id}/stats?${params}`);
+      setStats(next);
+      setToday(next.today);
+      setFrom(next.from);
+      setTo(next.to);
       setError('');
     } catch (err) {
       setError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [id, range, channel]);
+  }, [id, query, channel]);
 
   useEffect(() => {
     void load();
@@ -109,7 +339,6 @@ export function FinderAnalyticsPage() {
   const totals = stats?.totals;
   const feedbackTotal = totals ? totals.feedback.too_light + totals.feedback.just_right + totals.feedback.too_deep : 0;
   const advice = stats ? feedbackAdvice(stats) : null;
-  const maxDaily = stats ? Math.max(1, ...stats.daily.map((day) => day.sessions)) : 1;
   const firstStep = stats?.funnel[0]?.sessions ?? 0;
 
   return (
@@ -133,11 +362,17 @@ export function FinderAnalyticsPage() {
       </PageHeader>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={range} onValueChange={setRange}>
+        <Select
+          value={query.kind === 'days' ? query.days : 'custom'}
+          onValueChange={(value) => {
+            if (value !== 'custom') setQuery({ kind: 'days', days: value });
+          }}
+        >
           <SelectTrigger className="w-32">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            {query.kind === 'custom' ? <SelectItem value="custom">自定义</SelectItem> : null}
             {RANGES.map((item) => (
               <SelectItem key={item.value} value={item.value}>
                 {item.label}
@@ -145,6 +380,15 @@ export function FinderAnalyticsPage() {
             ))}
           </SelectContent>
         </Select>
+        {today && from && to ? (
+          <RangePicker
+            from={from}
+            to={to}
+            today={today}
+            disabled={loading}
+            onChange={(nextFrom, nextTo) => setQuery({ kind: 'custom', from: nextFrom, to: nextTo })}
+          />
+        ) : null}
         <Select value={channel} onValueChange={setChannel}>
           <SelectTrigger className="w-36">
             <SelectValue />
@@ -162,7 +406,7 @@ export function FinderAnalyticsPage() {
           <RefreshCw className={loading ? 'animate-spin' : undefined} />
         </Button>
         <InfoHint title="统计口径">
-          日期按 UTC 计。访客 = 同一台设备浏览器；会话 = 一次打开页面（关掉标签页后重新开算新会话）。漏斗按会话去重。深浅反馈记在当次「最佳匹配」色号上。
+          当天按服务器 UTC 日期计算，和入库日期一致，不看浏览器时间。访客 = 同一台设备浏览器；会话 = 一次打开页面（关掉标签页后重新开算新会话）。漏斗按会话去重。深浅反馈记在当次「最佳匹配」色号上。
         </InfoHint>
       </div>
 
@@ -254,24 +498,7 @@ export function FinderAnalyticsPage() {
               <CardTitle className="text-base">每日趋势（打开次数）</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex h-40 items-end gap-px overflow-x-auto">
-                {stats.daily.map((day) => (
-                  <div
-                    key={day.date}
-                    className="group flex min-w-1.5 flex-1 flex-col justify-end"
-                    title={`${day.date}\n打开 ${day.sessions} · 扫脸 ${day.scans} · 推荐 ${day.results} · 点击 ${day.linkClicks}`}
-                  >
-                    <div
-                      className="rounded-t-sm bg-primary/70 group-hover:bg-primary"
-                      style={{ height: `${(day.sessions / maxDaily) * 100}%`, minHeight: day.sessions ? 2 : 0 }}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-                <span>{stats.from}</span>
-                <span>{stats.to}</span>
-              </div>
+              <DailyLine days={stats.daily} />
             </CardContent>
           </Card>
 

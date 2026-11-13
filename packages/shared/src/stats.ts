@@ -47,6 +47,8 @@ export interface ButtonStat {
 }
 
 export interface FinderStats {
+  /** 服务器当天（UTC，与入库日期同一口径） */
+  today: string;
   from: string;
   to: string;
   channels: string[];

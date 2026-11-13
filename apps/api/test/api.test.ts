@@ -138,6 +138,23 @@ test('finder lifecycle', async () => {
   assert.equal(disabled.statusCode, 200);
   assert.equal((await call(null, 'GET', `/api/public/finders/${finder.code}`)).statusCode, 404);
 
+  const preview = await call(editor, 'POST', `/api/finders/${finder.id}/preview`);
+  assert.equal(preview.statusCode, 200);
+  const previewUrl = new URL(preview.json().url);
+  const token = previewUrl.searchParams.get('pv') ?? '';
+  assert.ok(token);
+  const previewed = await call(null, 'GET', `/api/public/finders/${finder.code}?pv=${encodeURIComponent(token)}`);
+  assert.equal(previewed.statusCode, 200);
+  assert.equal(previewed.headers['cache-control'], 'private, no-store');
+  assert.equal(previewed.json().variants.length, 2);
+  assert.equal((await call(null, 'GET', `/api/public/finders/${finder.code}?pv=not-a-pass`)).statusCode, 404);
+  const { signPreview } = await import('../src/preview.js');
+  const stale = signPreview(finder.code, Date.now() - 11 * 60 * 1000);
+  assert.equal(
+    (await call(null, 'GET', `/api/public/finders/${finder.code}?pv=${encodeURIComponent(stale.token)}`)).statusCode,
+    410,
+  );
+
   const copy = await call(editor, 'POST', `/api/finders/${finder.id}/duplicate`);
   assert.match(copy.json().finder.code, /^[a-z2-9]{8}$/);
   assert.notEqual(copy.json().finder.code, finder.code);
@@ -188,6 +205,7 @@ test('public events ingest', async () => {
 
   const boss = await login('boss@example.com');
   const stats = (await call(boss, 'GET', `/api/finders/fd_demo/stats?from=${today}&to=${today}`)).json();
+  assert.equal(stats.today, today);
   assert.equal(stats.totals.pageViews, 1);
   assert.equal(stats.totals.sessions, 1);
   assert.equal(stats.totals.feedback.too_light, 1);
@@ -202,4 +220,9 @@ test('public events ingest', async () => {
   assert.equal(amazon.totals.pageViews, 1);
 
   assert.equal((await call(boss, 'GET', `/api/finders/fd_demo/stats?from=${today}&to=2020-01-01`)).statusCode, 400);
+  const { shiftDate } = await import('../src/services/stats.js');
+  const week = (await call(boss, 'GET', '/api/finders/fd_demo/stats?days=6')).json();
+  assert.equal(week.to, today);
+  assert.equal(week.from, shiftDate(today, -6));
+  assert.equal((await call(boss, 'GET', '/api/finders/fd_demo/stats?to=2099-01-01&from=2099-01-01')).statusCode, 400);
 });

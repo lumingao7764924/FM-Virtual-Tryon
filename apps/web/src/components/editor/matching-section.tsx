@@ -37,7 +37,7 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
   const steps = Array.from({ length: DEPTH_STEP_MAX - DEPTH_STEP_MIN + 1 }, (_, i) => DEPTH_STEP_MAX - i);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Section
         title="匹配阈值"
         description="和 Shopify 版一致：深浅档位整体调节推荐偏浅还是偏深；近似池控制「偏浅 / 偏深」候选的范围。"
@@ -126,7 +126,7 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
             {(['lighter', 'best', 'deeper'] as const).map((role) => {
               const hit = results.find((item) => item.role === role);
               return (
-                <div key={role} className="flex items-center gap-3 rounded-lg border p-3">
+                <div key={role} className="flex items-center gap-3 border p-2.5">
                   <div
                     className="size-10 shrink-0 rounded-full border"
                     style={{ background: hit?.hex ?? 'transparent' }}

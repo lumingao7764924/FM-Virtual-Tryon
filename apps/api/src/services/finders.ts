@@ -14,7 +14,8 @@ import {
   type PaginatedListResponse,
   type PublicFinder,
 } from '@tryon/shared';
-import { badRequest, conflict, notFound } from '../errors.js';
+import { badRequest, conflict, gone, notFound } from '../errors.js';
+import { signPreview, verifyPreview, type PreviewPass } from '../preview.js';
 import type { FinderRepo } from '../store/types.js';
 
 const PUBLIC_CACHE_TTL_MS = 60_000;
@@ -184,6 +185,28 @@ export class FinderService {
 
   async getPublic(code: string): Promise<PublicFinder> {
     const finder = await this.findActiveByCode(code);
+    if (!finder) throw notFound('Shade finder not found');
+    return toPublicFinder(finder);
+  }
+
+  /** Latest config for a code, including disabled. Preview only. */
+  private async findLatestByCode(code: string): Promise<Finder | null> {
+    const key = code.trim().toLowerCase();
+    return (await this.repo.listLatest()).find((item) => item.code === key) ?? null;
+  }
+
+  /** Signed 10-minute pass. Nothing is written to storage. */
+  async issuePreview(id: string): Promise<PreviewPass & { code: string }> {
+    const finder = await this.get(id);
+    return { code: finder.code, ...signPreview(finder.code) };
+  }
+
+  /** Disabled finders stay reachable while the pass is valid. */
+  async getPreview(code: string, token: string): Promise<PublicFinder> {
+    const verdict = verifyPreview(token, code);
+    if (verdict === 'expired') throw gone('This preview link has expired.');
+    if (verdict !== 'ok') throw notFound('Shade finder not found');
+    const finder = await this.findLatestByCode(code);
     if (!finder) throw notFound('Shade finder not found');
     return toPublicFinder(finder);
   }

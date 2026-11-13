@@ -35,7 +35,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Section
         title={`跳转按钮（${buttons.length}/${MAX_BUTTONS}）`}
         description="替代 Shopify 的加购按钮：推荐结果下会显示这些按钮，点击跳到对应链接（新窗口打开）。没有链接的按钮不显示。"
@@ -66,7 +66,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
           {buttons.map((button, index) => {
             const path = `buttons.${index}`;
             return (
-              <div key={button.id} className={cn('rounded-lg border p-3', !button.enabled && 'opacity-60')}>
+              <div key={button.id} className={cn('border p-2.5', !button.enabled && 'opacity-60')}>
                 <div className="grid gap-3 md:grid-cols-[1fr_2fr_9rem]">
                   <Field label="按钮文字" error={errorAt(errors, `${path}.label`)}>
                     <Input
@@ -157,7 +157,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
 
       {buttons.length && draft.variants.length ? (
         <Section title="按色号单独设置链接" description="留空 = 用上面的默认链接。">
-          <div className="overflow-x-auto rounded-md border">
+          <div className="overflow-x-auto border">
             <Table>
               <TableHeader>
                 <TableRow>

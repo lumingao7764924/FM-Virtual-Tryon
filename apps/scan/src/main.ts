@@ -14,17 +14,20 @@ function showError(message: string) {
   root.replaceChildren(box);
 }
 
-async function loadFinder(code: string): Promise<PublicFinder | null> {
+async function loadFinder(code: string, preview: string): Promise<PublicFinder | null> {
+  const query = preview ? `?pv=${encodeURIComponent(preview)}` : '';
   try {
-    const response = await fetch(`/api/public/finders/${encodeURIComponent(code)}`, {
+    const response = await fetch(`/api/public/finders/${encodeURIComponent(code)}${query}`, {
       headers: { Accept: 'application/json' },
     });
+    if (response.status === 410) throw new Error('expired');
     if (response.ok) return (await response.json()) as PublicFinder;
     if (response.status === 404 && code !== 'demo') return null;
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === 'expired') throw err;
     /* API not reachable — fall through to demo in dev */
   }
-  if (import.meta.env.DEV && code === 'demo') return demoFinder();
+  if (!preview && import.meta.env.DEV && code === 'demo') return demoFinder();
   throw new Error('Finder unavailable');
 }
 
@@ -39,11 +42,17 @@ async function boot() {
     return;
   }
 
+  const search = new URLSearchParams(window.location.search);
+  const preview = search.get('pv')?.trim() || '';
   let finder: PublicFinder | null;
   try {
-    finder = await loadFinder(code);
-  } catch {
-    showError('Shade finder is temporarily unavailable. Please try again later.');
+    finder = await loadFinder(code, preview);
+  } catch (err) {
+    showError(
+      err instanceof Error && err.message === 'expired'
+        ? 'This preview link has expired. Generate a new one from the admin.'
+        : 'Shade finder is temporarily unavailable. Please try again later.',
+    );
     return;
   }
   if (!finder) {
@@ -51,8 +60,10 @@ async function boot() {
     return;
   }
 
-  const channel = new URLSearchParams(window.location.search).get('ch')?.trim().slice(0, 40) || '';
-  const tracker = createTracker(finder.code, finder.version, channel);
+  const channel = search.get('ch')?.trim().slice(0, 40) || '';
+  const tracker = preview
+    ? { track() {}, flush() {} }
+    : createTracker(finder.code, finder.version, channel);
   const app = new ShadeFinderApp(root, finder, tracker);
   if (import.meta.env.DEV) {
     // Console: fmDebug.capture(231, 196, 168)

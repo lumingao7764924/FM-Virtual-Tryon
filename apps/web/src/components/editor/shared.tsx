@@ -36,15 +36,15 @@ export function Section({
   className?: string;
 }) {
   return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
-        <div className="space-y-1">
+    <Card className={cn('rounded-none shadow-none', className)}>
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0 p-3">
+        <div className="space-y-0.5">
           <CardTitle className="text-base">{title}</CardTitle>
           {description ? <CardDescription>{description}</CardDescription> : null}
         </div>
         {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
       </CardHeader>
-      <CardContent className="space-y-4">{children}</CardContent>
+      <CardContent className="space-y-3 p-3 pt-0">{children}</CardContent>
     </Card>
   );
 }

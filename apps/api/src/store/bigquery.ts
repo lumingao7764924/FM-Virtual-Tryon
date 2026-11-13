@@ -74,9 +74,8 @@ class BigQueryEventRepo implements EventRepo {
           FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E3SZ', client_ts) AS client_ts,
           FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E3SZ', received_at) AS received_at
         FROM \`${this.dataset}.events\`
-        WHERE event_date BETWEEN @from AND @to AND finder_id = @finderId`,
+        WHERE CAST(event_date AS STRING) BETWEEN @from AND @to AND finder_id = @finderId`,
       params: { finderId, from, to },
-      types: { finderId: 'STRING', from: 'DATE', to: 'DATE' },
     });
     return rows as EventRow[];
   }

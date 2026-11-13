@@ -89,7 +89,13 @@ export function FindersPage() {
   async function openQr(item: FinderSummary) {
     try {
       const { scanUrl } = await detail(item.id);
-      setQrTarget({ code: item.code, title: item.title, scanUrl, active: item.status === 'active' });
+      setQrTarget({
+        id: item.id,
+        code: item.code,
+        title: item.title,
+        scanUrl,
+        active: item.status === 'active',
+      });
     } catch (err) {
       toast({ title: '获取链接失败', description: errorMessage(err), variant: 'destructive' });
     }

@@ -15,13 +15,15 @@ export function UndertoneSection({ draft, update, readOnly }: SectionProps) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Section
         title="冷 / 中 / 暖色调（Tone map）"
         description="开启后，扫脸结束会先让顾客选自己的色调，推荐时优先该色调的色号；选「不确定」则只按肤色深浅匹配。"
         actions={
           <div className="flex items-center gap-2">
-            <Label htmlFor="tone-enabled">{settings.enabled ? '已开启' : '已关闭'}</Label>
+            <Label htmlFor="tone-enabled" className="mb-0">
+              {settings.enabled ? '已开启' : '已关闭'}
+            </Label>
             <Switch
               id="tone-enabled"
               checked={settings.enabled}
@@ -66,9 +68,9 @@ export function UndertoneSection({ draft, update, readOnly }: SectionProps) {
       </Section>
 
       <Section title="色调选项" description="三个选项的文字、说明和色卡底色。">
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-3 lg:grid-cols-3">
           {settings.options.map((option, index) => (
-            <div key={option.id} className="space-y-3 rounded-lg border p-3">
+            <div key={option.id} className="space-y-3 border p-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{UNDERTONE_LABEL[option.id]}调</span>
                 <span className="rounded-md px-3 py-1 text-xs font-semibold" style={{ background: option.background }}>

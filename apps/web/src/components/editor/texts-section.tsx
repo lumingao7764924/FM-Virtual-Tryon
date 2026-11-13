@@ -45,13 +45,15 @@ export function TextsSection({ draft, update, readOnly }: SectionProps) {
   const { feedback, privacy, labels } = draft.settings;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <Section
         title="深浅反馈"
         description="结果出来几秒后弹出「偏浅 / 刚好 / 偏深」，数据页会按色号统计，用来调整匹配阈值。"
         actions={
           <div className="flex items-center gap-2">
-            <Label htmlFor="fb-enabled">{feedback.enabled ? '已开启' : '已关闭'}</Label>
+            <Label htmlFor="fb-enabled" className="mb-0">
+              {feedback.enabled ? '已开启' : '已关闭'}
+            </Label>
             <Switch
               id="fb-enabled"
               checked={feedback.enabled}
