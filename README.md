@@ -69,6 +69,10 @@ cp .env.example apps/api/.env   # 至少填 ADMIN_EMAILS
 - 深浅反馈记在当次「最佳匹配」色号上；日期按 UTC。
 - 不上传任何照片，只记录肤色 Lab 数值。
 
+### 正式环境
+
+和 VOC 一样用 Cloud Build：推到 GitHub `main` 后自动更新 Cloud Run。三个服务是后台 `tryon-web`、扫码页 `tryon-scan`、接口 `tryon-api`。步骤见 [docs/deploy-cloud-build.md](docs/deploy-cloud-build.md)。
+
 ### 对拍
 
 `packages/shared/test/fixtures/fm-makeup-routine.shopify.js` 是 Shopify 原版快照，对拍测试用它保证推荐结果一致；Shopify 侧算法改动后需要同步更新这份快照并重跑测试。
