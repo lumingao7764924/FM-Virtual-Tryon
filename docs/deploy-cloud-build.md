@@ -104,11 +104,11 @@ gcloud run deploy tryon-api \
   --allow-unauthenticated \
   --service-account tryon-api@feimei-virtual-tryon.iam.gserviceaccount.com \
   --set-secrets JWT_SECRET=tryon-jwt:latest \
-  --set-env-vars ^|^NODE_ENV=production|STORAGE=bigquery|GCP_PROJECT_ID=feimei-virtual-tryon|BQ_DATASET=tryon|COOKIE_SECURE=true|GOOGLE_CLIENT_ID=372608906672-jdqd67r8jpikq9grdr7229o3p5mc17pv.apps.googleusercontent.com|ADMIN_EMAILS=milolu1996@gmail.com|CORS_ORIGIN=https://placeholder.invalid|PUBLIC_SCAN_BASE_URL=https://placeholder.invalid \
+  --set-env-vars 'NODE_ENV=production,STORAGE=bigquery,GCP_PROJECT_ID=feimei-virtual-tryon,BQ_DATASET=tryon,COOKIE_SECURE=true,GOOGLE_CLIENT_ID=372608906672-jdqd67r8jpikq9grdr7229o3p5mc17pv.apps.googleusercontent.com,ADMIN_EMAILS=milolu1996@gmail.com,CORS_ORIGIN=https://placeholder.invalid,PUBLIC_SCAN_BASE_URL=https://placeholder.invalid' \
   --image us-central1-docker.pkg.dev/feimei-virtual-tryon/tryon/tryon-api:latest
 ```
 
-`--set-env-vars` 用 `|` 当分隔符，避免逗号把邮箱和网址截断。
+整段环境变量要放在单引号里，否则 Cloud Shell 会把分隔符当成管道。
 
 第一次 `builds submit` 里的部署步骤可能失败，因为服务还没有这些环境变量。只要镜像推上去了，第二条 `run deploy` 会把服务建起来。
 
@@ -148,7 +148,7 @@ SCAN_URL=https://tryon-scan-xxxxx.us-central1.run.app
 
 gcloud run services update tryon-api \
   --region us-central1 \
-  --update-env-vars ^|^CORS_ORIGIN=${WEB_URL},${SCAN_URL}|PUBLIC_SCAN_BASE_URL=${SCAN_URL}
+  --update-env-vars "^|^CORS_ORIGIN=${WEB_URL},${SCAN_URL}|PUBLIC_SCAN_BASE_URL=${SCAN_URL}"
 ```
 
 ### 4. Google 登录允许这个后台
