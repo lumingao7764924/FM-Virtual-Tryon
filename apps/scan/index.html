@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Find your shade</title>
+    <script>
+        // 750 design: 1rem = 100 design px. Phones scale with width (capped for tablets);
+        // desktop stays at the 375 baseline so the camera UI does not grow with the window.
+      (function () {
+        var root = document.documentElement;
+        var desktop = window.matchMedia('(min-width: 750px) and (pointer: fine)');
+        function setRem() {
+          var width = root.clientWidth || window.innerWidth || 375;
+          var base = desktop.matches ? 375 : Math.min(width, 540);
+          root.style.fontSize = base / 7.5 + 'px';
+        }
+        setRem();
+        window.addEventListener('resize', setRem);
+        window.addEventListener('orientationchange', setRem);
+        window.addEventListener('pageshow', function (event) {
+          if (event.persisted) setRem();
+        });
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "@tryon/scan",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tryon/shared": "*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.0.0",
+    "typescript": "^5.8.2",
+    "vite": "^6.2.2"
+  }
+}

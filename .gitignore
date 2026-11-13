@@ -1,0 +1,29 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# 本地环境与密钥（绝不要提交）
+.env
+.env.*
+!.env.example
+keys/
+credentials/
+*.pem
+*.p12
+service-account*.json
+gcp-key*.json
+*-credentials.json
+
+# 本地数据 / 临时文件
+.data/
+.tmp/
+*.log
+.DS_Store
+
+# 编辑器
+.cursor/mcp.json
+.vscode/
+.idea/

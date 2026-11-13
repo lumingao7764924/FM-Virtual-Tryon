@@ -1,0 +1,21 @@
+{
+  "name": "fm-try-on",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @tryon/api",
+    "dev:web": "npm run dev -w @tryon/web",
+    "dev:scan": "npm run dev -w @tryon/scan",
+    "build:shared": "npm run build -w @tryon/shared",
+    "build:api": "npm run build:shared && npm run build -w @tryon/api",
+    "build:scan": "npm run build -w @tryon/scan",
+    "build:web": "npm run build -w @tryon/web",
+    "test": "npm run test -w @tryon/shared && npm run test -w @tryon/api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

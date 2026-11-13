@@ -1,0 +1,103 @@
+/*
+ * Standalone page shell around the Shopify scanner styles (fm-makeup-pdp.css).
+ * Units: 750 design px / 100 = rem (html font-size is set in index.html). Hairline borders stay px.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: #ffffff;
+  color: #111111;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  /* html is 50px+ on phones; reset inherited text to 32 design px. */
+  font-size: 0.29rem;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+.fm-page__fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.22rem;
+  width: min(100%, 6.4rem);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: calc(0.58rem + env(safe-area-inset-top)) 0.43rem calc(0.58rem + env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.fm-page__fallback[hidden] {
+  display: none;
+}
+
+.fm-page__fallback-text {
+  width: 100%;
+  margin: 0;
+  font-size: 0.27rem;
+  line-height: 1.45;
+  text-align: justify;
+  color: rgba(17, 17, 17, 0.7);
+}
+
+.fm-page__fallback-text[hidden] {
+  display: none;
+}
+
+.fm-page__fallback-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.08rem;
+  min-height: 0.79rem;
+  padding: 0 0.29rem;
+  border: 0;
+  background: #1a1a1a;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.25rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fm-page__error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 0.58rem;
+  text-align: center;
+  font-size: 0.27rem;
+  color: rgba(17, 17, 17, 0.7);
+}
+
+/* Several jump buttons replace the single ADD TO CART. */
+.fm-page__links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.13rem;
+  margin-top: 0.1rem;
+}
+
+.fm-page__links .fm-pdp__bag {
+  margin-top: 0;
+  text-decoration: none;
+}
+
+.fm-page__links .fm-page__link--secondary {
+  background: #ffffff;
+  color: #1a1a1a;
+}
