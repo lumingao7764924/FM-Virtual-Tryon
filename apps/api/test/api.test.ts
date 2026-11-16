@@ -163,6 +163,17 @@ test('finder lifecycle', async () => {
   const list = await call(editor, 'GET', '/api/finders?q=glow&pageSize=10');
   assert.equal(list.json().total, 2);
   assert.ok(list.json().brands.includes('Skintific'));
+
+  const boss = await login('boss@example.com');
+  const denied = await call(boss, 'DELETE', `/api/finders/${finder.id}`);
+  assert.equal(denied.statusCode, 403);
+
+  const removed = await call(editor, 'DELETE', `/api/finders/${copy.json().finder.id}`);
+  assert.equal(removed.statusCode, 200);
+  const after = await call(editor, 'GET', '/api/finders?q=glow&pageSize=10');
+  assert.equal(after.json().total, 1);
+  const missing = await app.inject({ method: 'GET', url: `/api/public/finders/${copy.json().finder.code}` });
+  assert.equal(missing.statusCode, 404);
 });
 
 test('public events ingest', async () => {

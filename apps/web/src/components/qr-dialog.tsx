@@ -19,7 +19,7 @@ import {
   withChannel,
 } from '@/lib/finders';
 
-export type QrTarget = { id: string; code: string; title: string; scanUrl: string; active: boolean };
+export type QrTarget = { id: string; code: string; title: string; scanUrl: string; active: boolean; preview?: boolean };
 
 interface PreviewPass {
   url: string;
@@ -46,12 +46,35 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
   const url = target ? withChannel(target.scanUrl, channel) : '';
   const fileBase = target ? `qr-${target.code}${channel ? `-${channel}` : ''}` : 'qr';
   const expired = pass !== null && pass.expiresAt <= now;
+  const previewMode = pass !== null || (Boolean(target?.preview) && issuing);
 
   useEffect(() => {
     if (!target) return;
     setPreset('none');
     setCustom('');
     setPass(null);
+    if (!target.preview) return;
+    let cancelled = false;
+    setIssuing(true);
+    void (async () => {
+      try {
+        const issued = await apiFetch<{ url: string; expiresAt: string }>(`/api/finders/${target.id}/preview`, {
+          method: 'POST',
+        });
+        const image = await qrDataUrl(issued.url, 480);
+        if (!cancelled) {
+          setPass({ url: issued.url, expiresAt: Date.parse(issued.expiresAt), image });
+          setNow(Date.now());
+        }
+      } catch (err) {
+        if (!cancelled) toast({ title: '预览码生成失败', description: errorMessage(err), variant: 'destructive' });
+      } finally {
+        if (!cancelled) setIssuing(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [target]);
 
   useEffect(() => {
@@ -101,8 +124,8 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{pass ? '预览二维码' : '二维码'} · {target?.title}</DialogTitle>
-          <DialogDescription className="break-all font-mono text-xs">{pass ? pass.url : url}</DialogDescription>
+          <DialogTitle>{previewMode ? '预览二维码' : '二维码'} · {target?.title}</DialogTitle>
+          <DialogDescription className="break-all font-mono text-xs">{pass ? pass.url : previewMode ? '正在生成预览码' : url}</DialogDescription>
         </DialogHeader>
 
         {pass ? (
@@ -113,13 +136,13 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
                 : `非正式预览，剩余 ${remainLabel(pass.expiresAt, now)}。未启用也能扫码采集，过期后失效。不会写入数据库。`}
             </AlertDescription>
           </Alert>
-        ) : target && !target.active ? (
+        ) : previewMode ? null : target && !target.active ? (
           <Alert>
             <AlertDescription>该项目当前已停用，正式二维码扫码会提示不可用。预览码可以在停用时试用 10 分钟。</AlertDescription>
           </Alert>
         ) : null}
 
-        {pass ? null : (
+        {previewMode ? null : (
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <Label className="mb-0 leading-5">渠道</Label>
@@ -154,7 +177,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
         <div className="flex justify-center rounded-lg border bg-white p-3">
           {pass ? (
             <img src={pass.image} alt="预览二维码" className={expired ? 'size-60 opacity-30' : 'size-60'} />
-          ) : preview ? (
+          ) : preview && !previewMode ? (
             <img src={preview} alt="二维码" className="size-60" />
           ) : (
             <div className="size-60" />
@@ -173,7 +196,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
               <Undo2 /> 返回正式二维码
             </Button>
           </div>
-        ) : (
+        ) : previewMode ? null : (
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" onClick={() => run(async () => downloadHref(await qrDataUrl(url, 1024), `${fileBase}.png`))}>
               <Download /> PNG

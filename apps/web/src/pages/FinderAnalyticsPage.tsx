@@ -342,7 +342,8 @@ export function FinderAnalyticsPage() {
   const firstStep = stats?.funnel[0]?.sessions ?? 0;
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div>
+      <div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 px-3 py-3 backdrop-blur">
       <PageHeader
         title={
           <div className="flex min-w-0 items-center gap-2">
@@ -409,7 +410,9 @@ export function FinderAnalyticsPage() {
           当天按服务器 UTC 日期计算，和入库日期一致，不看浏览器时间。访客 = 同一台设备浏览器；会话 = 一次打开页面（关掉标签页后重新开算新会话）。漏斗按会话去重。深浅反馈记在当次「最佳匹配」色号上。
         </InfoHint>
       </div>
+      </div>
 
+      <div className="space-y-4 p-3">
       {error ? (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
@@ -579,6 +582,7 @@ export function FinderAnalyticsPage() {
           </div>
         </>
       ) : null}
+      </div>
     </div>
   );
 }

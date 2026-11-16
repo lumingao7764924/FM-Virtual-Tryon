@@ -44,6 +44,7 @@ export interface FinderSummary {
   updatedAt: string;
   updatedBy: string;
   createdAt: string;
+  createdBy: string;
 }
 
 export interface FinderVersionMeta {
@@ -88,5 +89,6 @@ export function toFinderSummary(finder: Finder): FinderSummary {
     updatedAt: finder.updatedAt,
     updatedBy: finder.updatedBy,
     createdAt: finder.createdAt,
+    createdBy: finder.createdBy,
   };
 }

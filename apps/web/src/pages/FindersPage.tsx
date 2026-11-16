@@ -12,6 +12,7 @@ import {
   PowerOff,
   QrCode,
   Search,
+  Trash2,
 } from 'lucide-react';
 import type { FinderSummary, PaginatedListResponse } from '@tryon/shared';
 import { apiFetch, errorMessage } from '@/api';
@@ -52,7 +53,7 @@ const ALL = '__all__';
 
 export function FindersPage() {
   const nav = useNavigate();
-  const { canEdit } = useAuth();
+  const { canEdit, session } = useAuth();
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -62,6 +63,8 @@ export function FindersPage() {
   const [page, setPage] = useState(1);
   const [qrTarget, setQrTarget] = useState<QrTarget | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [removing, setRemoving] = useState<FinderSummary | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,13 +114,32 @@ export function FindersPage() {
   }
 
   async function preview(item: FinderSummary) {
-    const tab = window.open('about:blank', '_blank');
     try {
       const { scanUrl } = await detail(item.id);
-      if (tab) tab.location.href = scanUrl;
+      setQrTarget({
+        id: item.id,
+        code: item.code,
+        title: item.title,
+        scanUrl,
+        active: item.status === 'active',
+        preview: true,
+      });
     } catch (err) {
-      tab?.close();
-      toast({ title: '打开失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: '预览码生成失败', description: errorMessage(err), variant: 'destructive' });
+    }
+  }
+
+  async function remove(item: FinderSummary) {
+    setRemovingBusy(true);
+    try {
+      await apiFetch(`/api/finders/${item.id}`, { method: 'DELETE' });
+      toast({ title: '已删除', variant: 'success' });
+      setRemoving(null);
+      void load();
+    } catch (err) {
+      toast({ title: '删除失败', description: errorMessage(err), variant: 'destructive' });
+    } finally {
+      setRemovingBusy(false);
     }
   }
 
@@ -153,11 +175,11 @@ export function FindersPage() {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <PageHeader
-        title="扫脸选色项目"
+        title="采集列表"
         actions={
           canEdit ? (
             <Button onClick={() => setCreateOpen(true)}>
-              <Plus /> 新建项目
+              <Plus /> 新建采集
             </Button>
           ) : null
         }
@@ -210,7 +232,7 @@ export function FindersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>产品</TableHead>
-              <TableHead className="hidden sm:table-cell">色号</TableHead>
+              <TableHead className="hidden sm:table-cell">色号数</TableHead>
               <TableHead>状态</TableHead>
               <TableHead className="hidden lg:table-cell">最后修改</TableHead>
               <TableHead className="w-12 text-right">操作</TableHead>
@@ -253,7 +275,7 @@ export function FindersPage() {
                       <DropdownMenuItem onSelect={() => nav(`/finders/${item.id}`)}>
                         <Pencil /> {canEdit ? '编辑' : '查看配置'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => void preview(item)} disabled={item.status !== 'active'}>
+                      <DropdownMenuItem onSelect={() => void preview(item)}>
                         <ExternalLink /> 预览
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => void openQr(item)}>
@@ -270,11 +292,16 @@ export function FindersPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => void toggleStatus(item)}
-                            className={item.status === 'active' ? 'text-destructive focus:text-destructive' : undefined}
+                            variant={item.status === 'active' ? 'destructive' : 'default'}
                           >
                             {item.status === 'active' ? <PowerOff /> : <Power />}
                             {item.status === 'active' ? '停用' : '启用'}
                           </DropdownMenuItem>
+                          {session?.email === item.createdBy ? (
+                            <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(item)}>
+                              <Trash2 /> 删除
+                            </DropdownMenuItem>
+                          ) : null}
                         </>
                       ) : null}
                     </DropdownMenuContent>
@@ -285,7 +312,7 @@ export function FindersPage() {
             {!loading && data?.items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                  {query || status !== ALL || brand !== ALL ? '没有符合条件的项目' : '还没有项目，点右上角「新建项目」开始'}
+                  {query || status !== ALL || brand !== ALL ? '没有符合条件的项目' : '还没有项目，点右上角「新建采集」开始'}
                 </TableCell>
               </TableRow>
             ) : null}
@@ -308,6 +335,22 @@ export function FindersPage() {
       ) : null}
 
       <QrDialog target={qrTarget} onOpenChange={(open) => !open && setQrTarget(null)} />
+      <Dialog open={removing !== null} onOpenChange={(open) => !open && !removingBusy && setRemoving(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除「{removing?.title}」？</DialogTitle>
+            <DialogDescription>删除后项目从列表消失，已经印出的正式二维码也不能再扫。此操作不能恢复。</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" disabled={removingBusy} onClick={() => setRemoving(null)}>
+              取消
+            </Button>
+            <Button variant="destructive" disabled={removingBusy} onClick={() => removing && void remove(removing)}>
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CreateFinderDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(id) => nav(`/finders/${id}`)} />
     </div>
   );
@@ -352,7 +395,7 @@ function CreateFinderDialog({
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>新建项目</DialogTitle>
+            <DialogTitle>新建采集</DialogTitle>
             <DialogDescription>一个产品一个项目、一个二维码。创建后再补充色号和按钮，默认是停用状态。</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

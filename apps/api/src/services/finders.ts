@@ -14,7 +14,7 @@ import {
   type PaginatedListResponse,
   type PublicFinder,
 } from '@tryon/shared';
-import { badRequest, conflict, gone, notFound } from '../errors.js';
+import { badRequest, conflict, forbidden, gone, notFound } from '../errors.js';
 import { signPreview, verifyPreview, type PreviewPass } from '../preview.js';
 import type { FinderRepo } from '../store/types.js';
 
@@ -44,6 +44,7 @@ export class FinderService {
     const all = await this.repo.listLatest();
     const q = query.q.trim().toLowerCase();
     const filtered = all
+      .filter((finder) => !finder.deleted)
       .filter((finder) => !query.status || finder.status === query.status)
       .filter((finder) => !query.brand || finder.brand === query.brand)
       .filter(
@@ -62,14 +63,30 @@ export class FinderService {
       total: filtered.length,
       page,
       pageSize,
-      brands: [...new Set(all.map((finder) => finder.brand).filter(Boolean))].sort(),
+      brands: [...new Set(all.filter((finder) => !finder.deleted).map((finder) => finder.brand).filter(Boolean))].sort(),
     };
   }
 
   async get(id: string): Promise<Finder> {
     const finder = await this.repo.getLatest(id);
-    if (!finder) throw notFound('试色项目不存在');
+    if (!finder || finder.deleted) throw notFound('试色项目不存在');
     return finder;
+  }
+
+  /** 只允许创建人删除。追加一行标记，已印出的正式码随即失效。 */
+  async remove(id: string, actor: string): Promise<void> {
+    const current = await this.get(id);
+    if (current.createdBy !== actor) throw forbidden('只能删除自己创建的项目');
+    const next: Finder = {
+      ...current,
+      deleted: true,
+      status: 'disabled',
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor,
+    };
+    await this.repo.append(next);
+    this.invalidate(current.code);
   }
 
   async history(id: string): Promise<FinderVersionMeta[]> {
@@ -178,7 +195,9 @@ export class FinderService {
     const key = code.trim().toLowerCase();
     const cached = this.publicCache.get(key);
     if (cached && Date.now() - cached.at < PUBLIC_CACHE_TTL_MS) return cached.finder;
-    const finder = (await this.repo.listLatest()).find((item) => item.code === key && item.status === 'active') ?? null;
+    const finder =
+      (await this.repo.listLatest()).find((item) => item.code === key && item.status === 'active' && !item.deleted) ??
+      null;
     this.publicCache.set(key, { at: Date.now(), finder });
     return finder;
   }
@@ -192,7 +211,7 @@ export class FinderService {
   /** Latest config for a code, including disabled. Preview only. */
   private async findLatestByCode(code: string): Promise<Finder | null> {
     const key = code.trim().toLowerCase();
-    return (await this.repo.listLatest()).find((item) => item.code === key) ?? null;
+    return (await this.repo.listLatest()).find((item) => item.code === key && !item.deleted) ?? null;
   }
 
   /** Signed 10-minute pass. Nothing is written to storage. */

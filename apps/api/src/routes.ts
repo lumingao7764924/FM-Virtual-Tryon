@@ -127,6 +127,12 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
     }
   );
 
+  app.delete<IdParams>('/api/finders/:id', async (request) => {
+    const user = await requireUser(request, users, 'edit');
+    await finders.remove(request.params.id, user.email);
+    return { ok: true };
+  });
+
   app.post<IdParams>('/api/finders/:id/duplicate', async (request, reply) => {
     const user = await requireUser(request, users, 'edit');
     const finder = await finders.duplicate(request.params.id, user.email);

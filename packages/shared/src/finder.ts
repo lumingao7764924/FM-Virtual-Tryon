@@ -99,6 +99,8 @@ export interface Finder {
   updatedBy: string;
   createdAt: string;
   createdBy: string;
+  /** 创建人删除后不再出现在列表和扫码页。 */
+  deleted?: boolean;
 }
 
 /** What the public scan page receives (no admin-only fields). */
