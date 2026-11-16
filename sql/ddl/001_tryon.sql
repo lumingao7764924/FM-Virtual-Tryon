@@ -28,12 +28,17 @@ CREATE TABLE IF NOT EXISTS `feimei-virtual-tryon.tryon.admin_users` (
   role STRING NOT NULL,
   status STRING NOT NULL,
   deleted BOOL,
+  scope STRING OPTIONS (description = 'all 全部项目，own 仅自己创建的'),
+  brands STRING OPTIONS (description = 'JSON 品牌数组，空数组表示全部品牌'),
   created_at TIMESTAMP,
   created_by STRING,
   updated_at TIMESTAMP NOT NULL,
   updated_by STRING
 )
 OPTIONS (description = '后台账号白名单（只追加）');
+
+ALTER TABLE `feimei-virtual-tryon.tryon.admin_users` ADD COLUMN IF NOT EXISTS scope STRING;
+ALTER TABLE `feimei-virtual-tryon.tryon.admin_users` ADD COLUMN IF NOT EXISTS brands STRING;
 
 -- 扫码页埋点：按天分区，按项目 + 事件聚簇
 CREATE TABLE IF NOT EXISTS `feimei-virtual-tryon.tryon.events` (

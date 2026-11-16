@@ -8,18 +8,17 @@ import { FindersPage } from '@/pages/FindersPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { useI18n, type Locale } from '@/i18n';
 import { ToastHost } from '@/components/toast';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
 
-const ROLE_LABEL = { admin: '管理员', editor: '编辑', viewer: '只读' } as const;
-
 const NAV = [
-  { to: '/finders', label: '扫脸选色项目', icon: ScanFace, adminOnly: false },
-  { to: '/settings/users', label: '账号管理', icon: Users, adminOnly: true },
-];
+  { to: '/finders', label: 'nav.finders', icon: ScanFace, adminOnly: false },
+  { to: '/settings/users', label: 'nav.users', icon: Users, adminOnly: true },
+] as const;
 
 function BrandMark() {
   return (
@@ -32,8 +31,34 @@ function BrandMark() {
   );
 }
 
+function LanguageToggle() {
+  const { locale, setLocale, t } = useI18n();
+  const options: { value: Locale; label: string }[] = [
+    { value: 'zh', label: '中' },
+    { value: 'en', label: 'EN' },
+  ];
+  return (
+    <div className="flex rounded-md border p-0.5" role="group" aria-label={t('nav.language')}>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={cn(
+            'h-7 rounded px-2 text-xs',
+            locale === option.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+          onClick={() => setLocale(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const { isAdmin } = useAuth();
+  const { t } = useI18n();
   return (
     <nav className="flex flex-col gap-0.5">
       {NAV.filter((item) => !item.adminOnly || isAdmin).map((item) => (
@@ -51,7 +76,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           }
         >
           <item.icon className="size-4 shrink-0" />
-          {item.label}
+          {t(item.label)}
         </NavLink>
       ))}
     </nav>
@@ -60,6 +85,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function UserFooter({ onLogout }: { onLogout: () => void }) {
   const { session } = useAuth();
+  const { t } = useI18n();
   if (!session) return null;
   return (
     <div className="space-y-2">
@@ -71,11 +97,11 @@ function UserFooter({ onLogout }: { onLogout: () => void }) {
           <p className="truncate text-xs" title={session.email}>
             {session.email}
           </p>
-          <p className="text-xs text-muted-foreground">{ROLE_LABEL[session.role]}</p>
+          <p className="text-xs text-muted-foreground">{t(`role.${session.role}`)}</p>
         </div>
       </div>
       <Button type="button" variant="outline" className="w-full" onClick={onLogout}>
-        退出登录
+        {t('nav.logout')}
       </Button>
     </div>
   );
@@ -84,6 +110,7 @@ function UserFooter({ onLogout }: { onLogout: () => void }) {
 function Shell() {
   const nav = useNavigate();
   const { logout } = useAuth();
+  const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function onLogout() {
@@ -102,7 +129,11 @@ function Shell() {
           <NavLinks />
           <div className="mt-auto space-y-3 pt-6">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-muted-foreground">外观</span>
+              <span className="text-xs text-muted-foreground">{t('nav.language')}</span>
+              <LanguageToggle />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">{t('nav.appearance')}</span>
               <ThemeToggle />
             </div>
             <UserFooter onLogout={() => void onLogout()} />
@@ -114,16 +145,17 @@ function Shell() {
         <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
           <BrandMark />
           <div className="flex items-center gap-2">
+            <LanguageToggle />
             <ThemeToggle />
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button type="button" variant="outline" size="icon" aria-label="打开菜单">
+                <Button type="button" variant="outline" size="icon" aria-label={t('nav.openMenu')}>
                   <Menu />
                 </Button>
               </SheetTrigger>
               <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-full">
                 <SheetHeader className="items-start border-b px-4 py-4">
-                  <SheetTitle className="sr-only">菜单</SheetTitle>
+                  <SheetTitle className="sr-only">{t('nav.menu')}</SheetTitle>
                   <BrandMark />
                 </SheetHeader>
                 <div className="flex h-full flex-1 flex-col p-4">
@@ -148,7 +180,8 @@ function Shell() {
 function RequireAuth({ children, admin }: { children: ReactNode; admin?: boolean }) {
   const { loading, session, isAdmin } = useAuth();
   const location = useLocation();
-  if (loading) return <p className="p-6 text-sm text-muted-foreground">检查登录状态…</p>;
+  const { t } = useI18n();
+  if (loading) return <p className="p-6 text-sm text-muted-foreground">{t('auth.checking')}</p>;
   if (!session) {
     const next = `${location.pathname}${location.search}`;
     return <Navigate to={`/login${next !== '/' ? `?next=${encodeURIComponent(next)}` : ''}`} replace />;

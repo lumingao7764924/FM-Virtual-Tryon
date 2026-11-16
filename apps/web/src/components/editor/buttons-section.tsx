@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 import { Field, Section, errorAt, type SectionProps } from './shared';
 
 function nextButtonId(buttons: FinderLinkButton[]): string {
@@ -17,6 +18,7 @@ function nextButtonId(buttons: FinderLinkButton[]): string {
 }
 
 export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps) {
+  const { t } = useI18n();
   const buttons = draft.buttons;
 
   function move(index: number, delta: number) {
@@ -37,8 +39,8 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
   return (
     <div className="space-y-3">
       <Section
-        title={`跳转按钮（${buttons.length}/${MAX_BUTTONS}）`}
-        description="替代 Shopify 的加购按钮：推荐结果下会显示这些按钮，点击跳到对应链接（新窗口打开）。没有链接的按钮不显示。"
+        title={t('buttons.title', { count: buttons.length, max: MAX_BUTTONS })}
+        description={t('buttons.desc')}
         actions={
           readOnly ? null : (
             <Button
@@ -56,7 +58,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                 )
               }
             >
-              <Plus /> 添加按钮
+              <Plus /> {t('buttons.add')}
             </Button>
           )
         }
@@ -68,7 +70,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
             return (
               <div key={button.id} className={cn('border p-2.5', !button.enabled && 'opacity-60')}>
                 <div className="grid gap-3 md:grid-cols-[1fr_2fr_9rem]">
-                  <Field label="按钮文字" error={errorAt(errors, `${path}.label`)}>
+                  <Field label={t('buttons.label')} error={errorAt(errors, `${path}.label`)}>
                     <Input
                       value={button.label}
                       disabled={readOnly}
@@ -76,9 +78,9 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                     />
                   </Field>
                   <Field
-                    label="默认链接"
+                    label={t('buttons.url')}
                     error={errorAt(errors, `${path}.url`)}
-                    hint="所有色号默认跳这个链接；某个色号需要单独的链接，在下方表格里填写覆盖。"
+                    hint={t('buttons.urlHint')}
                   >
                     <Input
                       value={button.url}
@@ -87,7 +89,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                       onChange={(e) => update((d) => void (d.buttons[index].url = e.target.value.trim()))}
                     />
                   </Field>
-                  <Field label="样式">
+                  <Field label={t('buttons.style')}>
                     <Select
                       value={button.style}
                       disabled={readOnly}
@@ -99,8 +101,8 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="primary">主按钮（实心）</SelectItem>
-                        <SelectItem value="secondary">次按钮（描边）</SelectItem>
+                        <SelectItem value="primary">{t('buttons.primary')}</SelectItem>
+                        <SelectItem value="secondary">{t('buttons.secondary')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </Field>
@@ -111,9 +113,9 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                       checked={button.enabled}
                       disabled={readOnly}
                       onCheckedChange={(checked) => update((d) => void (d.buttons[index].enabled = checked))}
-                      aria-label="启用按钮"
+                      aria-label={t('buttons.enableAria')}
                     />
-                    {button.enabled ? '显示' : '隐藏'}
+                    {button.enabled ? t('buttons.show') : t('buttons.hide')}
                     <span className="font-mono">ID: {button.id}</span>
                     {errorAt(errors, `${path}.id`) ? (
                       <span className="text-destructive">{errorAt(errors, `${path}.id`)}</span>
@@ -121,7 +123,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                   </div>
                   {readOnly ? null : (
                     <div className="flex gap-0.5">
-                      <Button variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => move(index, -1)} aria-label="上移">
+                      <Button variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => move(index, -1)} aria-label={t('buttons.up')}>
                         <ArrowUp />
                       </Button>
                       <Button
@@ -130,7 +132,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                         className="size-7"
                         disabled={index === buttons.length - 1}
                         onClick={() => move(index, 1)}
-                        aria-label="下移"
+                        aria-label={t('buttons.down')}
                       >
                         <ArrowDown />
                       </Button>
@@ -139,7 +141,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                         size="icon"
                         className="size-7 text-destructive hover:text-destructive"
                         onClick={() => removeButton(index)}
-                        aria-label="删除按钮"
+                        aria-label={t('buttons.delete')}
                       >
                         <Trash2 />
                       </Button>
@@ -150,18 +152,18 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
             );
           })}
           {buttons.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">没有按钮时，结果页只展示推荐色号。</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">{t('buttons.empty')}</p>
           ) : null}
         </div>
       </Section>
 
       {buttons.length && draft.variants.length ? (
-        <Section title="按色号单独设置链接" description="留空 = 用上面的默认链接。">
+        <Section title={t('buttons.perShade')} description={t('buttons.perShadeDesc')}>
           <div className="overflow-x-auto border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-40">色号</TableHead>
+                  <TableHead className="min-w-40">{t('buttons.shade')}</TableHead>
                   {buttons.map((button) => (
                     <TableHead key={button.id} className="min-w-56">
                       {button.label || button.id}
@@ -186,7 +188,7 @@ export function ButtonsSection({ draft, update, errors, readOnly }: SectionProps
                             className={cn('text-xs', error && 'border-destructive')}
                             title={error}
                             value={variant.links[button.id] ?? ''}
-                            placeholder={button.url || '（无默认链接）'}
+                            placeholder={button.url || t('buttons.noDefault')}
                             disabled={readOnly}
                             onChange={(e) =>
                               update((d) => {

@@ -92,5 +92,7 @@ export async function requireUser(
     picture: session.picture,
     role,
     bootstrap: resolved.bootstrap,
+    brands: resolved.brands,
+    scope: resolved.scope,
   };
 }

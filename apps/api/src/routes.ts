@@ -58,6 +58,8 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
       picture: profile.picture,
       role: resolved.role,
       bootstrap: resolved.bootstrap,
+      brands: resolved.brands,
+      scope: resolved.scope,
     };
     return { session, csrf };
   };
@@ -85,35 +87,39 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
   // ------------------------------------------------------------------ finders
 
   app.get('/api/finders', async (request) => {
-    await requireUser(request, users);
-    return finders.list({
-      page: queryInt(request, 'page', LIST_DEFAULT_PAGE),
-      pageSize: queryInt(request, 'pageSize', LIST_DEFAULT_PAGE_SIZE),
-      q: queryString(request, 'q'),
-      status: queryString(request, 'status'),
-      brand: queryString(request, 'brand'),
-    });
+    const user = await requireUser(request, users);
+    return finders.list(
+      {
+        page: queryInt(request, 'page', LIST_DEFAULT_PAGE),
+        pageSize: queryInt(request, 'pageSize', LIST_DEFAULT_PAGE_SIZE),
+        q: queryString(request, 'q'),
+        status: queryString(request, 'status'),
+        brand: queryString(request, 'brand'),
+      },
+      user
+    );
   });
 
   app.post<{ Body: { title?: string; brand?: string; code?: string } }>('/api/finders', async (request, reply) => {
     const user = await requireUser(request, users, 'edit');
     const finder = await finders.create(
       { title: request.body?.title ?? '', brand: request.body?.brand ?? '', code: request.body?.code },
-      user.email
+      user.email,
+      user
     );
     reply.code(201);
     return { finder, codeLocked: false, scanUrl: scanUrl(finder.code) };
   });
 
   app.get<IdParams>('/api/finders/:id', async (request) => {
-    await requireUser(request, users);
-    const finder = await finders.get(request.params.id);
+    const user = await requireUser(request, users);
+    const finder = await finders.get(request.params.id, user);
     return { finder, codeLocked: await finders.codeLocked(finder.id), scanUrl: scanUrl(finder.code) };
   });
 
   app.put<IdParams>('/api/finders/:id', async (request) => {
     const user = await requireUser(request, users, 'edit');
-    const finder = await finders.save(request.params.id, request.body, user.email);
+    const finder = await finders.save(request.params.id, request.body, user.email, user);
     return { finder, codeLocked: await finders.codeLocked(finder.id), scanUrl: scanUrl(finder.code) };
   });
 
@@ -122,32 +128,32 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
     async (request) => {
       const user = await requireUser(request, users, 'edit');
       const status: FinderStatus = request.body?.status === 'active' ? 'active' : 'disabled';
-      const finder = await finders.setStatus(request.params.id, status, Number(request.body?.version), user.email);
+      const finder = await finders.setStatus(request.params.id, status, Number(request.body?.version), user.email, user);
       return { finder, codeLocked: await finders.codeLocked(finder.id), scanUrl: scanUrl(finder.code) };
     }
   );
 
   app.delete<IdParams>('/api/finders/:id', async (request) => {
     const user = await requireUser(request, users, 'edit');
-    await finders.remove(request.params.id, user.email);
+    await finders.remove(request.params.id, user.email, user);
     return { ok: true };
   });
 
   app.post<IdParams>('/api/finders/:id/duplicate', async (request, reply) => {
     const user = await requireUser(request, users, 'edit');
-    const finder = await finders.duplicate(request.params.id, user.email);
+    const finder = await finders.duplicate(request.params.id, user.email, user);
     reply.code(201);
     return { finder, codeLocked: false, scanUrl: scanUrl(finder.code) };
   });
 
   app.get<IdParams>('/api/finders/:id/versions', async (request) => {
-    await requireUser(request, users);
-    return { items: await finders.history(request.params.id) };
+    const user = await requireUser(request, users);
+    return { items: await finders.history(request.params.id, user) };
   });
 
   app.post<IdParams>('/api/finders/:id/preview', async (request) => {
-    await requireUser(request, users);
-    const issued = await finders.issuePreview(request.params.id);
+    const user = await requireUser(request, users);
+    const issued = await finders.issuePreview(request.params.id, user);
     return {
       url: `${scanUrl(issued.code)}?pv=${encodeURIComponent(issued.token)}`,
       expiresAt: issued.expiresAt,
@@ -155,13 +161,13 @@ export async function registerRoutes(app: FastifyInstance, { finders, users, eve
   });
 
   app.get<{ Params: { id: string; version: string } }>('/api/finders/:id/versions/:version', async (request) => {
-    await requireUser(request, users);
-    return { finder: await finders.getVersion(request.params.id, Number(request.params.version)) };
+    const user = await requireUser(request, users);
+    return { finder: await finders.getVersion(request.params.id, Number(request.params.version), user) };
   });
 
   app.get<IdParams>('/api/finders/:id/stats', async (request) => {
-    await requireUser(request, users);
-    const finder = await finders.get(request.params.id);
+    const user = await requireUser(request, users);
+    const finder = await finders.get(request.params.id, user);
     return stats.forFinder(finder, {
       from: queryString(request, 'from'),
       to: queryString(request, 'to'),

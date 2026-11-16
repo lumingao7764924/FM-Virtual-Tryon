@@ -1,13 +1,17 @@
+import { useAuth } from '@/hooks/use-auth';
 import { BrandSelect } from '@/components/brand-select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useI18n } from '@/i18n';
 import { Field, Section, errorAt, type SectionProps } from './shared';
 
 export function BasicSection({ draft, update, errors, readOnly, scanUrl }: SectionProps & { scanUrl: string }) {
+  const { session } = useAuth();
+  const { t } = useI18n();
   return (
-    <Section title="基本信息" description="名称和品牌用于后台识别，页面标题用产品名称。不显示价格。">
+    <Section title={t('editor.tab.basic')} description={t('basic.desc')}>
       <div className="grid gap-3 md:grid-cols-2">
-        <Field label="产品名称" htmlFor="f-title" error={errorAt(errors, 'title')}>
+        <Field label={t('basic.name')} htmlFor="f-title" error={errorAt(errors, 'title')}>
           <Input
             id="f-title"
             value={draft.title}
@@ -15,24 +19,25 @@ export function BasicSection({ draft, update, errors, readOnly, scanUrl }: Secti
             onChange={(e) => update((d) => void (d.title = e.target.value))}
           />
         </Field>
-        <Field label="品牌" htmlFor="f-brand" error={errorAt(errors, 'brand')}>
+        <Field label={t('basic.brand')} htmlFor="f-brand" error={errorAt(errors, 'brand')}>
           <BrandSelect
             id="f-brand"
             value={draft.brand}
             disabled={readOnly}
+            brands={session?.brands}
             invalid={Boolean(errorAt(errors, 'brand'))}
             onChange={(brand) => update((d) => void (d.brand = brand))}
           />
         </Field>
         <Field
-          label="扫码链接"
+          label={t('basic.link')}
           className="md:col-span-2"
-          hint="创建时自动生成、全局唯一，之后不会改变，所以已经印出去的二维码一直有效。"
+          hint={t('basic.linkHint')}
         >
           <Input value={scanUrl} readOnly className="font-mono text-xs" />
         </Field>
       </div>
-      <Field label="内部备注" htmlFor="f-notes" hint="只在后台可见，例如对应的 Amazon ASIN、包装批次等。">
+      <Field label={t('basic.notes')} htmlFor="f-notes" hint={t('basic.notesHint')}>
         <Textarea
           id="f-notes"
           rows={3}

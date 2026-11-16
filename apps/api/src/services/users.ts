@@ -1,4 +1,14 @@
-import { ADMIN_ROLES, type AdminRole, type AdminUser, type AdminUserStatus } from '@tryon/shared';
+import {
+  ADMIN_ROLES,
+  normalizeBrand,
+  normalizeBrandScope,
+  normalizeProjectScope,
+  type AdminRole,
+  type AdminUser,
+  type AdminUserStatus,
+  type FinderBrand,
+  type ProjectScope,
+} from '@tryon/shared';
 import { env } from '../config.js';
 import { badRequest, conflict, forbidden, notFound } from '../errors.js';
 import type { UserRepo } from '../store/types.js';
@@ -11,6 +21,8 @@ export interface ResolvedUser {
   name: string;
   role: AdminRole;
   bootstrap: boolean;
+  brands: FinderBrand[];
+  scope: ProjectScope;
 }
 
 export interface UserListItem extends AdminUser {
@@ -25,7 +37,14 @@ export class UserService {
   private async users(): Promise<AdminUser[]> {
     if (!this.cache || Date.now() - this.cache.at > CACHE_TTL_MS) {
       const rows = await this.repo.listLatest();
-      this.cache = { at: Date.now(), users: rows.filter((row) => !row.deleted) };
+      this.cache = {
+        at: Date.now(),
+        users: rows.filter((row) => !row.deleted).map((row) => ({
+          ...row,
+          brands: normalizeBrandScope(row.brands),
+          scope: normalizeProjectScope(row.scope),
+        })),
+      };
     }
     return this.cache.users;
   }
@@ -39,11 +58,19 @@ export class UserService {
     const key = email.trim().toLowerCase();
     if (this.isBootstrap(key)) {
       const stored = (await this.users()).find((user) => user.email === key);
-      return { email: key, name: stored?.name || '', role: 'admin', bootstrap: true };
+      return { email: key, name: stored?.name || '', role: 'admin', bootstrap: true, brands: [], scope: 'all' };
     }
     const user = (await this.users()).find((item) => item.email === key);
     if (!user || user.status !== 'active') return null;
-    return { email: key, name: user.name, role: user.role, bootstrap: false };
+    const full = user.role === 'admin';
+    return {
+      email: key,
+      name: user.name,
+      role: user.role,
+      bootstrap: false,
+      brands: full ? [] : user.brands,
+      scope: full ? 'all' : user.scope,
+    };
   }
 
   async list(): Promise<UserListItem[]> {
@@ -60,6 +87,8 @@ export class UserService {
         createdBy: 'ADMIN_EMAILS',
         updatedAt: '',
         updatedBy: 'ADMIN_EMAILS',
+        brands: [],
+        scope: 'all',
         bootstrap: true,
       });
     });
@@ -67,7 +96,7 @@ export class UserService {
   }
 
   async upsert(
-    input: { email?: unknown; name?: unknown; role?: unknown; status?: unknown },
+    input: { email?: unknown; name?: unknown; role?: unknown; status?: unknown; brands?: unknown; scope?: unknown },
     actor: string,
     mode: 'create' | 'update'
   ): Promise<AdminUser> {
@@ -76,6 +105,9 @@ export class UserService {
     const role = String(input.role ?? 'viewer') as AdminRole;
     if (!ADMIN_ROLES.includes(role)) throw badRequest('角色不正确', [{ path: 'role', message: '角色不正确' }]);
     const status: AdminUserStatus = input.status === 'disabled' ? 'disabled' : 'active';
+    if (Array.isArray(input.brands) && input.brands.some((item) => !normalizeBrand(item))) {
+      throw badRequest('品牌不在可选范围内', [{ path: 'brands', message: '品牌不在可选范围内' }]);
+    }
     if (this.isBootstrap(email) && (role !== 'admin' || status !== 'active')) {
       throw forbidden('ADMIN_EMAILS 中的账号固定为启用的管理员');
     }
@@ -83,6 +115,8 @@ export class UserService {
     const existing = (await this.users()).find((user) => user.email === email);
     if (mode === 'create' && existing) throw conflict('该邮箱已在名单中');
     if (mode === 'update' && !existing && !this.isBootstrap(email)) throw notFound('账号不存在');
+    const brands = input.brands === undefined && existing ? existing.brands : normalizeBrandScope(input.brands);
+    const scope = input.scope === undefined && existing ? existing.scope : normalizeProjectScope(input.scope);
 
     const now = new Date().toISOString();
     const user: AdminUser = {
@@ -90,6 +124,8 @@ export class UserService {
       name: String(input.name ?? existing?.name ?? '').trim().slice(0, 60),
       role,
       status,
+      brands: role === 'admin' ? [] : brands,
+      scope: role === 'admin' ? 'all' : scope,
       createdAt: existing?.createdAt || now,
       createdBy: existing?.createdBy || actor,
       updatedAt: now,

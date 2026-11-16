@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { FieldError, Finder } from '@tryon/shared';
 import { InfoHint } from '@/components/info-hint';
+import { useI18n } from '@/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -64,13 +65,14 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
+  const { t } = useI18n();
   return (
     <div className={cn('space-y-1.5', className)}>
       <div className="flex items-center gap-1.5">
         <Label htmlFor={htmlFor} className="mb-0 leading-5">
           {label}
         </Label>
-        {hint ? <InfoHint title={typeof label === 'string' ? label : '说明'}>{hint}</InfoHint> : null}
+        {hint ? <InfoHint title={typeof label === 'string' ? label : t('editor.hint')}>{hint}</InfoHint> : null}
       </div>
       {children}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

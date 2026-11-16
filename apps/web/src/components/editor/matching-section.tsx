@@ -11,18 +11,15 @@ import {
 import { ColorField } from '@/components/color-field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useI18n, type MessageKey } from '@/i18n';
 import { Field, Section, type SectionProps } from './shared';
-import { UNDERTONE_LABEL } from './variants-section';
+import { TONE_KEY } from './variants-section';
 
-const ROLE_LABEL: Record<ShadeRole, string> = { lighter: '偏浅一档', best: '最佳匹配', deeper: '偏深一档' };
+const ROLE_KEY: Record<ShadeRole, MessageKey> = { lighter: 'match.lighter', best: 'match.best', deeper: 'match.deeper' };
 const SAMPLE_SKINS = ['#F1D3BE', '#E2B897', '#D6A47E', '#BC8763', '#8D5B3E'];
 
-function depthLabel(step: number): string {
-  if (step === 0) return '0（标准）';
-  return step > 0 ? `+${step}（更偏浅）` : `${step}（更偏深）`;
-}
-
 export function MatchingSection({ draft, update, readOnly }: SectionProps) {
+  const { t } = useI18n();
   const matching = draft.settings.matching;
   const [skin, setSkin] = useState(SAMPLE_SKINS[1]);
   const [preference, setPreference] = useState<'none' | Undertone>('none');
@@ -35,17 +32,21 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
   }, [skin, preference, draft.variants, matching]);
 
   const steps = Array.from({ length: DEPTH_STEP_MAX - DEPTH_STEP_MIN + 1 }, (_, i) => DEPTH_STEP_MAX - i);
+  const depthLabel = (step: number) => {
+    if (step === 0) return t('match.depthZero');
+    return step > 0 ? t('match.depthLight', { step }) : t('match.depthDeep', { step });
+  };
 
   return (
     <div className="space-y-3">
       <Section
-        title="匹配阈值"
-        description="和 Shopify 版一致：深浅档位整体调节推荐偏浅还是偏深；近似池控制「偏浅 / 偏深」候选的范围。"
+        title={t('match.title')}
+        description={t('match.desc')}
       >
         <div className="grid gap-4 md:grid-cols-3">
           <Field
-            label="深浅档位"
-            hint="-10 … +10，每档约 0.4 L。正数整体推荐更浅，负数更深。顾客普遍反馈「太深」就往正调。"
+            label={t('match.depth')}
+            hint={t('match.depthHint')}
           >
             <Select
               value={String(matching.depthStep)}
@@ -64,7 +65,7 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="近似池大小（高级）" hint="取得分最好的前 N 个色号作为候选，默认 7。色号很多时可适当调大。">
+          <Field label={t('match.pool')} hint={t('match.poolHint')}>
             <Input
               type="number"
               min={3}
@@ -74,7 +75,7 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
               onChange={(e) => update((d) => void (d.settings.matching.nearPoolSize = Number(e.target.value)))}
             />
           </Field>
-          <Field label="最大额外色差（高级）" hint="候选与最佳的色差（ΔE）超过这个值就不推荐，默认 10。越小越严格。">
+          <Field label={t('match.delta')} hint={t('match.deltaHint')}>
             <Input
               type="number"
               min={1}
@@ -88,9 +89,9 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
         </div>
       </Section>
 
-      <Section title="试算" description="输入一个肤色，按当前设置（未保存也生效）看看会推荐哪三个色号。">
+      <Section title={t('match.try')} description={t('match.tryDesc')}>
         <div className="flex flex-wrap items-end gap-4">
-          <Field label="肤色">
+          <Field label={t('match.skin')}>
             <ColorField value={skin} onChange={setSkin} />
           </Field>
           <div className="flex gap-1.5 pb-1">
@@ -101,20 +102,20 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
                 className="size-7 rounded-full border"
                 style={{ background: hex }}
                 onClick={() => setSkin(hex)}
-                aria-label={`示例肤色 ${hex}`}
+                aria-label={t('match.skinAria', { hex })}
               />
             ))}
           </div>
-          <Field label="顾客选的色调">
+          <Field label={t('match.pref')}>
             <Select value={preference} onValueChange={(value) => setPreference(value as typeof preference)}>
               <SelectTrigger className="w-36">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">不确定 / 未开启</SelectItem>
+                <SelectItem value="none">{t('match.unsure')}</SelectItem>
                 {(['cool', 'neutral', 'warm'] as const).map((tone) => (
                   <SelectItem key={tone} value={tone}>
-                    {UNDERTONE_LABEL[tone]}调
+                    {t('undertone.option', { name: t(TONE_KEY[tone]) })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -132,16 +133,16 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
                     style={{ background: hit?.hex ?? 'transparent' }}
                   />
                   <div className="min-w-0 text-sm">
-                    <p className="text-xs text-muted-foreground">{ROLE_LABEL[role]}</p>
+                    <p className="text-xs text-muted-foreground">{t(ROLE_KEY[role])}</p>
                     {hit ? (
                       <>
                         <p className="truncate font-medium">{hit.variant.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {UNDERTONE_LABEL[hit.undertone]} · ΔE {hit.de.toFixed(1)}
+                          {t(TONE_KEY[hit.undertone])} · ΔE {hit.de.toFixed(1)}
                         </p>
                       </>
                     ) : (
-                      <p className="text-muted-foreground">无合适色号</p>
+                      <p className="text-muted-foreground">{t('match.none')}</p>
                     )}
                   </div>
                 </div>
@@ -149,7 +150,7 @@ export function MatchingSection({ draft, update, readOnly }: SectionProps) {
             })}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">先添加并启用色号。</p>
+          <p className="text-sm text-muted-foreground">{t('match.needShades')}</p>
         )}
       </Section>
     </div>

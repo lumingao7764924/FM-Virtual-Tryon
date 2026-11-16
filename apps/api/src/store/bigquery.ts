@@ -1,5 +1,5 @@
 import { BigQuery } from '@google-cloud/bigquery';
-import type { Finder } from '@tryon/shared';
+import { normalizeBrandScope, type Finder, type FinderBrand } from '@tryon/shared';
 import { SnapshotFinderRepo, SnapshotUserRepo, type AppendTable, type UserRow } from './snapshot.js';
 import type { EventRepo, EventRow, Repos } from './types.js';
 
@@ -11,6 +11,15 @@ type Row = Record<string, unknown>;
 /** BigQuery TIMESTAMP / DATE come back as `{ value }` wrappers. */
 function scalar(value: unknown): unknown {
   return value && typeof value === 'object' && 'value' in value ? (value as { value: unknown }).value : value;
+}
+
+function parseBrands(value: unknown): FinderBrand[] {
+  if (typeof value !== 'string' || !value.trim()) return [];
+  try {
+    return normalizeBrandScope(JSON.parse(value));
+  } catch {
+    return [];
+  }
 }
 
 class BigQuerySnapshotTable<T> implements AppendTable<T> {
@@ -121,6 +130,8 @@ export function createBigQueryRepos(projectId: string, dataset: string): Repos {
       createdBy: String(row.created_by ?? ''),
       updatedAt: String(scalar(row.updated_at) ?? ''),
       updatedBy: String(row.updated_by ?? ''),
+      brands: parseBrands(row.brands),
+      scope: row.scope === 'own' ? 'own' : 'all',
     }),
     (user) => ({
       email: user.email,
@@ -132,6 +143,8 @@ export function createBigQueryRepos(projectId: string, dataset: string): Repos {
       created_by: user.createdBy,
       updated_at: user.updatedAt,
       updated_by: user.updatedBy,
+      brands: JSON.stringify(user.brands ?? []),
+      scope: user.scope === 'own' ? 'own' : 'all',
     })
   );
 

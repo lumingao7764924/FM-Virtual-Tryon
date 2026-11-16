@@ -18,6 +18,7 @@ import type { FinderSummary, PaginatedListResponse } from '@tryon/shared';
 import { apiFetch, errorMessage } from '@/api';
 import { useAuth } from '@/hooks/use-auth';
 import { BrandSelect } from '@/components/brand-select';
+import { InfoHint } from '@/components/info-hint';
 import { PageHeader } from '@/components/page-header';
 import { QrDialog, type QrTarget } from '@/components/qr-dialog';
 import { StatusBadge } from '@/components/status-badge';
@@ -45,6 +46,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { copyText, type FinderDetail } from '@/lib/finders';
 import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/i18n';
 
 type ListResponse = PaginatedListResponse<FinderSummary> & { brands: string[] };
 
@@ -54,6 +56,7 @@ const ALL = '__all__';
 export function FindersPage() {
   const nav = useNavigate();
   const { canEdit, session } = useAuth();
+  const { t } = useI18n();
   const [data, setData] = useState<ListResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -75,11 +78,11 @@ export function FindersPage() {
       if (brand !== ALL) params.set('brand', brand);
       setData(await apiFetch<ListResponse>(`/api/finders?${params}`));
     } catch (err) {
-      toast({ title: '加载失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastLoad'), description: errorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [page, query, status, brand]);
+  }, [page, query, status, brand, t]);
 
   useEffect(() => {
     void load();
@@ -100,16 +103,16 @@ export function FindersPage() {
         active: item.status === 'active',
       });
     } catch (err) {
-      toast({ title: '获取链接失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastLink'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
   async function copyLink(item: FinderSummary) {
     try {
       await copyText((await detail(item.id)).scanUrl);
-      toast({ title: '扫码链接已复制', variant: 'success' });
+      toast({ title: t('finders.toastCopied'), variant: 'success' });
     } catch (err) {
-      toast({ title: '复制失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastCopyFail'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
@@ -125,7 +128,7 @@ export function FindersPage() {
         preview: true,
       });
     } catch (err) {
-      toast({ title: '预览码生成失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastPreview'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
@@ -133,11 +136,11 @@ export function FindersPage() {
     setRemovingBusy(true);
     try {
       await apiFetch(`/api/finders/${item.id}`, { method: 'DELETE' });
-      toast({ title: '已删除', variant: 'success' });
+      toast({ title: t('finders.toastDeleted'), variant: 'success' });
       setRemoving(null);
       void load();
     } catch (err) {
-      toast({ title: '删除失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastDeleteFail'), description: errorMessage(err), variant: 'destructive' });
     } finally {
       setRemovingBusy(false);
     }
@@ -147,20 +150,20 @@ export function FindersPage() {
     const next = item.status === 'active' ? 'disabled' : 'active';
     try {
       await apiFetch(`/api/finders/${item.id}/status`, { method: 'POST', json: { status: next, version: item.version } });
-      toast({ title: next === 'active' ? '已启用' : '已停用', variant: 'success' });
+      toast({ title: next === 'active' ? t('finders.toastEnabled') : t('finders.toastDisabled'), variant: 'success' });
       void load();
     } catch (err) {
-      toast({ title: '操作失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastActionFail'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
   async function duplicate(item: FinderSummary) {
     try {
       const res = await apiFetch<FinderDetail>(`/api/finders/${item.id}/duplicate`, { method: 'POST', json: {} });
-      toast({ title: '已复制为新项目（停用状态）', variant: 'success' });
+      toast({ title: t('finders.toastDuplicated'), variant: 'success' });
       nav(`/finders/${res.finder.id}`);
     } catch (err) {
-      toast({ title: '复制失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastCopyFail'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
@@ -175,11 +178,11 @@ export function FindersPage() {
   return (
     <div className="space-y-4 p-4 md:p-6">
       <PageHeader
-        title="采集列表"
+        title={t('finders.title')}
         actions={
           canEdit ? (
             <Button onClick={() => setCreateOpen(true)}>
-              <Plus /> 新建采集
+              <Plus /> {t('finders.create')}
             </Button>
           ) : null
         }
@@ -188,7 +191,7 @@ export function FindersPage() {
       <div className="flex flex-wrap items-center gap-2">
         <form onSubmit={search} className="relative w-full sm:w-72">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" placeholder="搜索名称 / 品牌 / SKU" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className="pl-9" placeholder={t('finders.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         </form>
         <Select
           value={status}
@@ -201,9 +204,9 @@ export function FindersPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>全部状态</SelectItem>
-            <SelectItem value="active">启用中</SelectItem>
-            <SelectItem value="disabled">已停用</SelectItem>
+            <SelectItem value={ALL}>{t('finders.allStatus')}</SelectItem>
+            <SelectItem value="active">{t('status.active')}</SelectItem>
+            <SelectItem value="disabled">{t('status.disabled')}</SelectItem>
           </SelectContent>
         </Select>
         <Select
@@ -217,7 +220,7 @@ export function FindersPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>全部品牌</SelectItem>
+            <SelectItem value={ALL}>{t('finders.allBrands')}</SelectItem>
             {data?.brands.map((name) => (
               <SelectItem key={name} value={name}>
                 {name}
@@ -231,11 +234,11 @@ export function FindersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>产品</TableHead>
-              <TableHead className="hidden sm:table-cell">色号数</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className="hidden lg:table-cell">最后修改</TableHead>
-              <TableHead className="w-12 text-right">操作</TableHead>
+              <TableHead>{t('finders.product')}</TableHead>
+              <TableHead className="hidden sm:table-cell">{t('finders.shades')}</TableHead>
+              <TableHead>{t('finders.status')}</TableHead>
+              <TableHead className="hidden lg:table-cell">{t('finders.updated')}</TableHead>
+              <TableHead className="w-12 text-right">{t('finders.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -264,42 +267,42 @@ export function FindersPage() {
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label="操作">
+                      <Button variant="ghost" size="icon" aria-label={t('finders.actions')}>
                         <MoreHorizontal />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-44">
                       <DropdownMenuItem onSelect={() => nav(`/finders/${item.id}/analytics`)}>
-                        <ChartColumn /> 查看数据
+                        <ChartColumn /> {t('finders.analytics')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => nav(`/finders/${item.id}`)}>
-                        <Pencil /> {canEdit ? '编辑' : '查看配置'}
+                        <Pencil /> {canEdit ? t('finders.edit') : t('finders.view')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => void preview(item)}>
-                        <ExternalLink /> 预览
+                        <ExternalLink /> {t('finders.preview')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => void openQr(item)}>
-                        <QrCode /> 下载二维码
+                        <QrCode /> {t('finders.qr')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => void copyLink(item)}>
-                        <Copy /> 复制链接
+                        <Copy /> {t('finders.copyLink')}
                       </DropdownMenuItem>
                       {canEdit ? (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onSelect={() => void duplicate(item)}>
-                            <CopyPlus /> 复制项目
+                            <CopyPlus /> {t('finders.duplicate')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => void toggleStatus(item)}
                             variant={item.status === 'active' ? 'destructive' : 'default'}
                           >
                             {item.status === 'active' ? <PowerOff /> : <Power />}
-                            {item.status === 'active' ? '停用' : '启用'}
+                            {item.status === 'active' ? t('finders.disable') : t('finders.enable')}
                           </DropdownMenuItem>
                           {session?.email === item.createdBy ? (
                             <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(item)}>
-                              <Trash2 /> 删除
+                              <Trash2 /> {t('finders.delete')}
                             </DropdownMenuItem>
                           ) : null}
                         </>
@@ -312,7 +315,7 @@ export function FindersPage() {
             {!loading && data?.items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                  {query || status !== ALL || brand !== ALL ? '没有符合条件的项目' : '还没有项目，点右上角「新建采集」开始'}
+                  {query || status !== ALL || brand !== ALL ? t('finders.emptyFiltered') : t('finders.empty')}
                 </TableCell>
               </TableRow>
             ) : null}
@@ -323,13 +326,13 @@ export function FindersPage() {
       {data && data.total > PAGE_SIZE ? (
         <div className="flex items-center justify-end gap-2 text-sm">
           <span className="text-muted-foreground">
-            共 {data.total} 个 · 第 {page}/{totalPages} 页
+            {t('finders.pager', { total: data.total, page, pages: totalPages })}
           </span>
           <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            上一页
+            {t('finders.prev')}
           </Button>
           <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            下一页
+            {t('finders.next')}
           </Button>
         </div>
       ) : null}
@@ -338,33 +341,41 @@ export function FindersPage() {
       <Dialog open={removing !== null} onOpenChange={(open) => !open && !removingBusy && setRemoving(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>删除「{removing?.title}」？</DialogTitle>
-            <DialogDescription>删除后项目从列表消失，已经印出的正式二维码也不能再扫。此操作不能恢复。</DialogDescription>
+            <DialogTitle>{t('finders.deleteTitle', { title: removing?.title ?? '' })}</DialogTitle>
+            <DialogDescription>{t('finders.deleteBody')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" disabled={removingBusy} onClick={() => setRemoving(null)}>
-              取消
+              {t('finders.cancel')}
             </Button>
             <Button variant="destructive" disabled={removingBusy} onClick={() => removing && void remove(removing)}>
-              删除
+              {t('finders.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <CreateFinderDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={(id) => nav(`/finders/${id}`)} />
+      <CreateFinderDialog
+        open={createOpen}
+        brands={session?.brands ?? []}
+        onOpenChange={setCreateOpen}
+        onCreated={(id) => nav(`/finders/${id}`)}
+      />
     </div>
   );
 }
 
 function CreateFinderDialog({
   open,
+  brands,
   onOpenChange,
   onCreated,
 }: {
   open: boolean;
+  brands: readonly string[];
   onOpenChange: (open: boolean) => void;
   onCreated: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const [title, setTitle] = useState('');
   const [brand, setBrand] = useState('');
   const [busy, setBusy] = useState(false);
@@ -372,9 +383,9 @@ function CreateFinderDialog({
   useEffect(() => {
     if (open) {
       setTitle('');
-      setBrand('');
+      setBrand(brands.length === 1 ? brands[0] : '');
     }
-  }, [open]);
+  }, [open, brands]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -384,7 +395,7 @@ function CreateFinderDialog({
       onOpenChange(false);
       onCreated(res.finder.id);
     } catch (err) {
-      toast({ title: '创建失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('finders.toastCreateFail'), description: errorMessage(err), variant: 'destructive' });
     } finally {
       setBusy(false);
     }
@@ -395,23 +406,25 @@ function CreateFinderDialog({
       <DialogContent className="sm:max-w-md">
         <form onSubmit={submit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle>新建采集</DialogTitle>
-            <DialogDescription>一个产品一个项目、一个二维码。创建后再补充色号和按钮，默认是停用状态。</DialogDescription>
+            <DialogTitle className="flex items-center gap-1.5">
+              {t('finders.create')}
+              <InfoHint title={t('finders.createTitle')}>{t('finders.createHint')}</InfoHint>
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="new-title">产品名称</Label>
+            <Label htmlFor="new-title">{t('finders.productName')}</Label>
             <Input id="new-title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="new-brand">品牌</Label>
-            <BrandSelect id="new-brand" value={brand} onChange={setBrand} />
+            <Label htmlFor="new-brand">{t('finders.brand')}</Label>
+            <BrandSelect id="new-brand" value={brand} brands={brands} onChange={setBrand} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              取消
+              {t('finders.cancel')}
             </Button>
             <Button type="submit" disabled={busy || !title.trim() || !brand}>
-              创建
+              {t('finders.submitCreate')}
             </Button>
           </DialogFooter>
         </form>

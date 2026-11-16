@@ -26,19 +26,20 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useI18n, type MessageKey } from '@/i18n';
 import type { FinderDetail } from '@/lib/finders';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type TabKey = 'basic' | 'variants' | 'undertone' | 'matching' | 'buttons' | 'texts';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'basic', label: '基本信息' },
-  { key: 'variants', label: '色号变体' },
-  { key: 'undertone', label: '冷中暖色调' },
-  { key: 'matching', label: '匹配阈值' },
-  { key: 'buttons', label: '跳转按钮' },
-  { key: 'texts', label: '文案与样式' },
+const TABS: { key: TabKey; label: MessageKey }[] = [
+  { key: 'basic', label: 'editor.tab.basic' },
+  { key: 'variants', label: 'editor.tab.variants' },
+  { key: 'undertone', label: 'editor.tab.undertone' },
+  { key: 'matching', label: 'editor.tab.matching' },
+  { key: 'buttons', label: 'editor.tab.buttons' },
+  { key: 'texts', label: 'editor.tab.texts' },
 ];
 
 function tabOfError(path: string): TabKey {
@@ -60,6 +61,7 @@ const fingerprint = (finder: Finder | null) => (finder ? JSON.stringify(toSaveIn
 export function FinderEditorPage() {
   const { id = '' } = useParams();
   const nav = useNavigate();
+  const { t } = useI18n();
   const { canEdit } = useAuth();
   const readOnly = !canEdit;
   const [detail, setDetail] = useState<FinderDetail | null>(null);
@@ -125,11 +127,11 @@ export function FinderEditorPage() {
       if (err instanceof ApiError && err.fields.length) {
         setErrors(err.fields);
         setTab(tabOfError(err.fields[0].path));
-        toast({ title: '有内容需要修改', description: `${err.fields.length} 处问题，已标红`, variant: 'destructive' });
+        toast({ title: t('editor.fixFields'), description: t('editor.fixCount', { count: err.fields.length }), variant: 'destructive' });
       } else if (err instanceof ApiError && err.status === 409 && err.code === 'version_conflict') {
         setConflict(true);
       } else {
-        toast({ title: '保存失败', description: errorMessage(err), variant: 'destructive' });
+        toast({ title: t('editor.saveFail'), description: errorMessage(err), variant: 'destructive' });
       }
       return false;
     } finally {
@@ -138,13 +140,13 @@ export function FinderEditorPage() {
   }
 
   function save() {
-    if (draft) void persist(toSaveInput(draft), '已保存');
+    if (draft) void persist(toSaveInput(draft), t('editor.saved'));
   }
 
   function toggleStatus() {
     if (!draft) return;
     const status = draft.status === 'active' ? 'disabled' : 'active';
-    void persist({ ...toSaveInput(draft), status }, status === 'active' ? '已启用' : '已停用');
+    void persist({ ...toSaveInput(draft), status }, status === 'active' ? t('editor.enabled') : t('editor.disabled'));
   }
 
   async function restoreVersion(version: number) {
@@ -155,9 +157,9 @@ export function FinderEditorPage() {
         Object.assign(d, structuredClone(finder), keep);
       });
       setHistoryOpen(false);
-      toast({ title: '已载入历史内容', description: '确认无误后点「保存」生效' });
+      toast({ title: t('editor.restored'), description: t('editor.restoreHint') });
     } catch (err) {
-      toast({ title: '载入失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('editor.restoreFail'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
@@ -165,13 +167,13 @@ export function FinderEditorPage() {
     return (
       <div className="p-4 md:p-6">
         <Alert variant="destructive">
-          <AlertTitle>无法打开项目</AlertTitle>
+          <AlertTitle>{t('editor.openFail')}</AlertTitle>
           <AlertDescription>{loadError}</AlertDescription>
         </Alert>
       </div>
     );
   }
-  if (!draft || !detail) return <p className="p-6 text-sm text-muted-foreground">加载中…</p>;
+  if (!draft || !detail) return <p className="p-6 text-sm text-muted-foreground">{t('editor.loading')}</p>;
 
   const sectionProps = { draft, update, errors, readOnly };
   const active = draft.status === 'active';
@@ -183,7 +185,7 @@ export function FinderEditorPage() {
           <PageHeader
             title={
               <div className="flex min-w-0 items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => nav('/finders')} aria-label="返回列表">
+                <Button variant="ghost" size="icon" onClick={() => nav('/finders')} aria-label={t('editor.back')}>
                   <ArrowLeft />
                 </Button>
                 <h1 className="truncate text-2xl font-semibold tracking-tight">{detail.finder.title}</h1>
@@ -192,7 +194,7 @@ export function FinderEditorPage() {
             actions={
               <>
                 <Button variant="outline" size="sm" onClick={() => nav(`/finders/${id}/analytics`)}>
-                  <ChartColumn /> 数据
+                  <ChartColumn /> {t('editor.analytics')}
                 </Button>
                 <Button
                   variant="outline"
@@ -207,10 +209,10 @@ export function FinderEditorPage() {
                     })
                   }
                 >
-                  <QrCode /> 二维码
+                  <QrCode /> {t('editor.qr')}
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-                  <History /> 历史
+                  <History /> {t('editor.history')}
                 </Button>
               </>
             }
@@ -223,7 +225,7 @@ export function FinderEditorPage() {
 
           {readOnly ? (
             <Alert>
-              <AlertDescription>你的账号是只读权限，只能查看配置。</AlertDescription>
+              <AlertDescription>{t('editor.readOnly')}</AlertDescription>
             </Alert>
           ) : null}
 
@@ -231,7 +233,7 @@ export function FinderEditorPage() {
             <TabsList>
               {TABS.map((item) => (
                 <TabsTrigger key={item.key} value={item.key} className="relative">
-                  {item.label}
+                  {t(item.label)}
                   {errorTabs.has(item.key) ? <span className="ml-1 size-1.5 rounded-full bg-destructive" /> : null}
                 </TabsTrigger>
               ))}
@@ -264,20 +266,20 @@ export function FinderEditorPage() {
         <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur md:left-60">
           <div className="flex items-center justify-between gap-2 px-3 py-3">
             <p className={cn('text-sm', dirty ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-              {dirty ? '有未保存的修改' : '所有修改已保存'}
+              {dirty ? t('editor.dirty') : t('editor.clean')}
             </p>
             <div className="flex gap-2">
               {dirty ? (
                 <Button variant="ghost" onClick={() => applyDetail(detail)} disabled={saving}>
-                  <Undo2 /> 撤销修改
+                  <Undo2 /> {t('editor.revert')}
                 </Button>
               ) : null}
               <Button variant={active ? 'outline' : 'secondary'} onClick={toggleStatus} disabled={saving}>
                 {active ? <PowerOff /> : <Power />}
-                {active ? '保存并停用' : dirty ? '保存并启用' : '启用'}
+                {active ? t('editor.saveDisable') : dirty ? t('editor.saveEnable') : t('editor.enable')}
               </Button>
               <Button onClick={save} disabled={saving || !dirty}>
-                <Save /> 保存
+                <Save /> {t('editor.save')}
               </Button>
             </div>
           </div>
@@ -296,16 +298,14 @@ export function FinderEditorPage() {
       <Dialog open={conflict} onOpenChange={setConflict}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>内容已被其他人修改</DialogTitle>
-            <DialogDescription>
-              在你编辑期间，有人保存了新版本。重新加载会丢掉你当前未保存的修改。
-            </DialogDescription>
+            <DialogTitle>{t('editor.conflictTitle')}</DialogTitle>
+            <DialogDescription>{t('editor.conflictBody')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConflict(false)}>
-              先不处理
+              {t('editor.conflictLater')}
             </Button>
-            <Button onClick={() => void load()}>重新加载最新版本</Button>
+            <Button onClick={() => void load()}>{t('editor.conflictReload')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -313,14 +313,14 @@ export function FinderEditorPage() {
       <Dialog open={blocker.state === 'blocked'} onOpenChange={(open) => !open && blocker.reset?.()}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>离开前要保存吗？</DialogTitle>
-            <DialogDescription>当前有未保存的修改，离开后会丢失。</DialogDescription>
+            <DialogTitle>{t('editor.leaveTitle')}</DialogTitle>
+            <DialogDescription>{t('editor.leaveBody')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => blocker.proceed?.()}>
-              不保存，直接离开
+              {t('editor.leave')}
             </Button>
-            <Button onClick={() => blocker.reset?.()}>留在此页</Button>
+            <Button onClick={() => blocker.reset?.()}>{t('editor.stay')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -341,21 +341,22 @@ function HistoryDialog({
   currentVersion: number;
   onRestore?: (version: number) => void;
 }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<FinderVersionMeta[]>([]);
 
   useEffect(() => {
     if (!open) return;
     apiFetch<{ items: FinderVersionMeta[] }>(`/api/finders/${finderId}/versions`)
       .then((res) => setItems(res.items))
-      .catch((err) => toast({ title: '加载历史失败', description: errorMessage(err), variant: 'destructive' }));
-  }, [open, finderId, currentVersion]);
+      .catch((err) => toast({ title: t('editor.historyFail'), description: errorMessage(err), variant: 'destructive' }));
+  }, [open, finderId, currentVersion, t]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>修改历史</DialogTitle>
-          <DialogDescription>每次保存都会留一份记录。载入历史内容后需要再保存才会生效（启用状态保持当前值）。</DialogDescription>
+          <DialogTitle>{t('editor.historyTitle')}</DialogTitle>
+          <DialogDescription>{t('editor.historyBody')}</DialogDescription>
         </DialogHeader>
         <div className="max-h-96 divide-y overflow-y-auto rounded-md border">
           {items.map((item) => (
@@ -363,7 +364,7 @@ function HistoryDialog({
               <div className="min-w-0">
                 <p className="font-medium">
                   {formatDateTime(item.updatedAt)}
-                  {item.version === currentVersion ? <span className="ml-2 text-xs text-muted-foreground">当前</span> : null}
+                  {item.version === currentVersion ? <span className="ml-2 text-xs text-muted-foreground">{t('editor.current')}</span> : null}
                 </p>
                 <p className="truncate text-xs text-muted-foreground">{item.updatedBy}</p>
               </div>
@@ -371,7 +372,7 @@ function HistoryDialog({
                 <StatusBadge status={item.status} />
                 {onRestore && item.version !== currentVersion ? (
                   <Button variant="outline" size="sm" onClick={() => onRestore(item.version)}>
-                    载入
+                    {t('editor.loadVersion')}
                   </Button>
                 ) : null}
               </div>

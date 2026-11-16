@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import {
   LIST_MAX_PAGE_SIZE,
   createDefaultFinderSettings,
+  canAccessFinder,
   normalizeBrand,
   normalizeFinderSave,
   toFinderSummary,
@@ -9,6 +10,7 @@ import {
   type Finder,
   type FinderCreateInput,
   type FinderStatus,
+  type ProjectScope,
   type FinderSummary,
   type FinderVersionMeta,
   type PaginatedListResponse,
@@ -31,6 +33,12 @@ export interface FinderListQuery {
   brand: string;
 }
 
+export interface FinderAccess {
+  email: string;
+  brands: readonly string[];
+  scope: ProjectScope;
+}
+
 function shortId(prefix: string): string {
   return `${prefix}_${randomBytes(6).toString('base64url').replace(/[-_]/g, '').slice(0, 8).toLowerCase()}`;
 }
@@ -40,11 +48,11 @@ export class FinderService {
 
   constructor(private readonly repo: FinderRepo) {}
 
-  async list(query: FinderListQuery): Promise<PaginatedListResponse<FinderSummary> & { brands: string[] }> {
+  async list(query: FinderListQuery, access: FinderAccess): Promise<PaginatedListResponse<FinderSummary> & { brands: string[] }> {
     const all = await this.repo.listLatest();
+    const visible = all.filter((finder) => !finder.deleted && canAccessFinder(access, finder));
     const q = query.q.trim().toLowerCase();
-    const filtered = all
-      .filter((finder) => !finder.deleted)
+    const filtered = visible
       .filter((finder) => !query.status || finder.status === query.status)
       .filter((finder) => !query.brand || finder.brand === query.brand)
       .filter(
@@ -63,19 +71,19 @@ export class FinderService {
       total: filtered.length,
       page,
       pageSize,
-      brands: [...new Set(all.filter((finder) => !finder.deleted).map((finder) => finder.brand).filter(Boolean))].sort(),
+      brands: (access.brands.length > 0 ? [...access.brands] : [...new Set(visible.map((finder) => finder.brand).filter(Boolean))]).sort(),
     };
   }
 
-  async get(id: string): Promise<Finder> {
+  async get(id: string, access: FinderAccess): Promise<Finder> {
     const finder = await this.repo.getLatest(id);
-    if (!finder || finder.deleted) throw notFound('试色项目不存在');
+    if (!finder || finder.deleted || !canAccessFinder(access, finder)) throw notFound('试色项目不存在');
     return finder;
   }
 
   /** 只允许创建人删除。追加一行标记，已印出的正式码随即失效。 */
-  async remove(id: string, actor: string): Promise<void> {
-    const current = await this.get(id);
+  async remove(id: string, actor: string, access: FinderAccess): Promise<void> {
+    const current = await this.get(id, access);
     if (current.createdBy !== actor) throw forbidden('只能删除自己创建的项目');
     const next: Finder = {
       ...current,
@@ -89,12 +97,13 @@ export class FinderService {
     this.invalidate(current.code);
   }
 
-  async history(id: string): Promise<FinderVersionMeta[]> {
-    await this.get(id);
+  async history(id: string, access: FinderAccess): Promise<FinderVersionMeta[]> {
+    await this.get(id, access);
     return this.repo.history(id);
   }
 
-  async getVersion(id: string, version: number): Promise<Finder> {
+  async getVersion(id: string, version: number, access: FinderAccess): Promise<Finder> {
+    await this.get(id, access);
     const finder = await this.repo.getVersion(id, version);
     if (!finder) throw notFound('版本不存在');
     return finder;
@@ -115,11 +124,14 @@ export class FinderService {
     }
   }
 
-  async create(input: FinderCreateInput, actor: string): Promise<Finder> {
+  async create(input: FinderCreateInput, actor: string, access: FinderAccess): Promise<Finder> {
     const title = String(input.title ?? '').trim().slice(0, 120);
     if (!title) throw badRequest('请填写产品名称', [{ path: 'title', message: '请填写产品名称' }]);
     const brand = normalizeBrand(input.brand);
     if (!brand) throw badRequest('请选择品牌', [{ path: 'brand', message: '请选择品牌' }]);
+    if (access.brands.length > 0 && !access.brands.includes(brand)) {
+      throw forbidden('不能在这个品牌下新建');
+    }
     const code = await this.uniqueCode();
     const now = new Date().toISOString();
     const finder: Finder = {
@@ -142,10 +154,13 @@ export class FinderService {
     return finder;
   }
 
-  async save(id: string, raw: unknown, actor: string): Promise<Finder> {
-    const current = await this.get(id);
+  async save(id: string, raw: unknown, actor: string, access: FinderAccess): Promise<Finder> {
+    const current = await this.get(id, access);
     const { value, errors } = normalizeFinderSave({ ...(raw as object), code: current.code });
     if (errors.length) throw badRequest('保存失败：请检查标红的字段', errors);
+    if (access.brands.length > 0 && !access.brands.includes(value.brand)) {
+      throw forbidden('不能改到这个品牌');
+    }
     if (value.version !== current.version) {
       throw conflict(`该项目已被 ${current.updatedBy} 修改过，请刷新后再改`, 'version_conflict');
     }
@@ -162,13 +177,13 @@ export class FinderService {
     return next;
   }
 
-  async setStatus(id: string, status: FinderStatus, version: number, actor: string): Promise<Finder> {
-    const current = await this.get(id);
-    return this.save(id, { ...current, status, version }, actor);
+  async setStatus(id: string, status: FinderStatus, version: number, actor: string, access: FinderAccess): Promise<Finder> {
+    const current = await this.get(id, access);
+    return this.save(id, { ...current, status, version }, actor, access);
   }
 
-  async duplicate(id: string, actor: string): Promise<Finder> {
-    const source = await this.get(id);
+  async duplicate(id: string, actor: string, access: FinderAccess): Promise<Finder> {
+    const source = await this.get(id, access);
     const now = new Date().toISOString();
     const copy: Finder = {
       ...structuredClone(source),
@@ -215,8 +230,8 @@ export class FinderService {
   }
 
   /** Signed 10-minute pass. Nothing is written to storage. */
-  async issuePreview(id: string): Promise<PreviewPass & { code: string }> {
-    const finder = await this.get(id);
+  async issuePreview(id: string, access: FinderAccess): Promise<PreviewPass & { code: string }> {
+    const finder = await this.get(id, access);
     return { code: finder.code, ...signPreview(finder.code) };
   }
 

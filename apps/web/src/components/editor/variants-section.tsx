@@ -24,11 +24,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useI18n, type MessageKey } from '@/i18n';
 import { newLocalId } from '@/lib/finders';
 import { cn } from '@/lib/utils';
 import { Section, errorAt, type SectionProps } from './shared';
 
-export const UNDERTONE_LABEL: Record<Undertone, string> = { cool: '冷', neutral: '中性', warm: '暖' };
+export const TONE_KEY: Record<Undertone, MessageKey> = { cool: 'tone.cool', neutral: 'tone.neutral', warm: 'tone.warm' };
 
 function autoTone(hex: string): Undertone | null {
   const normalized = normalizeHex(hex);
@@ -66,12 +67,12 @@ const TONE_ALIASES: Record<string, UndertoneSetting> = {
 
 interface ParsedPaste {
   variants: FinderVariant[];
-  problems: string[];
+  problems: number[];
 }
 
 function parsePaste(text: string): ParsedPaste {
   const variants: FinderVariant[] = [];
-  const problems: string[] = [];
+  const problems: number[] = [];
   text
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -81,7 +82,7 @@ function parsePaste(text: string): ParsedPaste {
       const [name, sku, hexRaw, toneRaw] = cells;
       const hex = normalizeHex(hexRaw);
       if (!name || !hex) {
-        problems.push(`第 ${index + 1} 行：需要「名称, SKU, 色值」，色值如 #E0B898`);
+        problems.push(index + 1);
         return;
       }
       variants.push({
@@ -98,6 +99,7 @@ function parsePaste(text: string): ParsedPaste {
 }
 
 export function VariantsSection({ draft, update, errors, readOnly }: SectionProps) {
+  const { t } = useI18n();
   const [pasteOpen, setPasteOpen] = useState(false);
   const variants = draft.variants;
 
@@ -111,20 +113,20 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
 
   return (
     <Section
-      title={`色号变体（${variants.length}）`}
-      description="色值决定推荐结果；色调选「自动」时按色值自动判断冷/中/暖。停用的色号不会参与推荐。"
+      title={t('variants.title', { count: variants.length })}
+      description={t('variants.desc')}
       actions={
         readOnly ? null : (
           <>
             <Button variant="outline" size="sm" onClick={() => setPasteOpen(true)}>
-              <ClipboardPaste /> 批量粘贴
+              <ClipboardPaste /> {t('variants.paste')}
             </Button>
             <Button
               size="sm"
               disabled={variants.length >= MAX_VARIANTS}
               onClick={() => update((d) => void d.variants.push(blankVariant()))}
             >
-              <Plus /> 添加色号
+              <Plus /> {t('variants.add')}
             </Button>
           </>
         )
@@ -136,12 +138,12 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
           <TableHeader>
             <TableRow>
               <TableHead className="w-10">#</TableHead>
-              <TableHead className="min-w-44">色值</TableHead>
-              <TableHead className="min-w-40">名称</TableHead>
+              <TableHead className="min-w-44">{t('variants.hex')}</TableHead>
+              <TableHead className="min-w-40">{t('variants.name')}</TableHead>
               <TableHead className="min-w-32">SKU</TableHead>
-              <TableHead className="min-w-36">色调</TableHead>
-              <TableHead className="w-16">启用</TableHead>
-              {readOnly ? null : <TableHead className="w-28 text-right">排序 / 删除</TableHead>}
+              <TableHead className="min-w-36">{t('variants.tone')}</TableHead>
+              <TableHead className="w-16">{t('variants.enabled')}</TableHead>
+              {readOnly ? null : <TableHead className="w-28 text-right">{t('variants.order')}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -156,7 +158,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
                       value={variant.hex}
                       disabled={readOnly}
                       invalid={Boolean(errorAt(errors, `${path}.hex`))}
-                      aria-label={`第 ${index + 1} 行色值`}
+                      aria-label={t('variants.hexAria', { row: index + 1 })}
                       onChange={(hex) => update((d) => void (d.variants[index].hex = hex))}
                     />
                   </TableCell>
@@ -189,10 +191,10 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="auto">自动{auto ? `（${UNDERTONE_LABEL[auto]}）` : ''}</SelectItem>
-                        <SelectItem value="cool">冷</SelectItem>
-                        <SelectItem value="neutral">中性</SelectItem>
-                        <SelectItem value="warm">暖</SelectItem>
+                        <SelectItem value="auto">{t('variants.auto', { hint: auto ? ` (${t(TONE_KEY[auto])})` : '' })}</SelectItem>
+                        <SelectItem value="cool">{t('tone.cool')}</SelectItem>
+                        <SelectItem value="neutral">{t('tone.neutral')}</SelectItem>
+                        <SelectItem value="warm">{t('tone.warm')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </TableCell>
@@ -201,13 +203,13 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
                       checked={variant.enabled}
                       disabled={readOnly}
                       onCheckedChange={(checked) => update((d) => void (d.variants[index].enabled = checked))}
-                      aria-label="启用"
+                      aria-label={t('variants.enabled')}
                     />
                   </TableCell>
                   {readOnly ? null : (
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-0.5">
-                        <Button variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => move(index, -1)} aria-label="上移">
+                        <Button variant="ghost" size="icon" className="size-7" disabled={index === 0} onClick={() => move(index, -1)} aria-label={t('variants.up')}>
                           <ArrowUp />
                         </Button>
                         <Button
@@ -216,7 +218,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
                           className="size-7"
                           disabled={index === variants.length - 1}
                           onClick={() => move(index, 1)}
-                          aria-label="下移"
+                          aria-label={t('variants.down')}
                         >
                           <ArrowDown />
                         </Button>
@@ -225,7 +227,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
                           size="icon"
                           className="size-7 text-destructive hover:text-destructive"
                           onClick={() => update((d) => void d.variants.splice(index, 1))}
-                          aria-label="删除"
+                          aria-label={t('variants.delete')}
                         >
                           <Trash2 />
                         </Button>
@@ -238,7 +240,7 @@ export function VariantsSection({ draft, update, errors, readOnly }: SectionProp
             {variants.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                  还没有色号。可以逐个添加，或从表格复制后「批量粘贴」。
+                  {t('variants.empty')}
                 </TableCell>
               </TableRow>
             ) : null}
@@ -267,6 +269,7 @@ function PasteDialog({
   onOpenChange: (open: boolean) => void;
   onApply: (rows: FinderVariant[], mode: 'append' | 'replace') => void;
 }) {
+  const { t } = useI18n();
   const [text, setText] = useState('');
   const parsed = parsePaste(text);
 
@@ -280,10 +283,8 @@ function PasteDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>批量粘贴色号</DialogTitle>
-          <DialogDescription>
-            每行一个色号：名称、SKU、色值、色调（可省略，默认自动）。可直接从 Excel 复制几列粘贴进来。
-          </DialogDescription>
+          <DialogTitle>{t('variants.pasteTitle')}</DialogTitle>
+          <DialogDescription>{t('variants.pasteBody')}</DialogDescription>
         </DialogHeader>
         <Textarea
           rows={10}
@@ -293,21 +294,21 @@ function PasteDialog({
           onChange={(e) => setText(e.target.value)}
         />
         <div className="text-xs text-muted-foreground">
-          识别到 {parsed.variants.length} 个色号
+          {t('variants.parsed', { count: parsed.variants.length })}
           {parsed.problems.length ? (
             <ul className="mt-1 space-y-0.5 text-destructive">
-              {parsed.problems.slice(0, 5).map((problem) => (
-                <li key={problem}>{problem}</li>
+              {parsed.problems.slice(0, 5).map((row) => (
+                <li key={row}>{t('variants.rowError', { row })}</li>
               ))}
             </ul>
           ) : null}
         </div>
         <DialogFooter className="gap-2">
           <Button variant="outline" disabled={!parsed.variants.length} onClick={() => apply('replace')}>
-            替换现有全部
+            {t('variants.replace')}
           </Button>
           <Button disabled={!parsed.variants.length} onClick={() => apply('append')}>
-            追加到末尾
+            {t('variants.append')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -176,6 +176,33 @@ test('finder lifecycle', async () => {
   assert.equal(missing.statusCode, 404);
 });
 
+test('brand and ownership scope', async () => {
+  const boss = await login('boss@example.com');
+  const created = await call(boss, 'POST', '/api/admin/users', {
+    email: 'limited@example.com',
+    role: 'editor',
+    brands: ['TimePhoria'],
+    scope: 'own',
+  });
+  assert.equal(created.statusCode, 201, created.body);
+  const limited = await login('limited@example.com');
+
+  const outside = await call(limited, 'POST', '/api/finders', { title: 'Other brand', brand: 'Skintific' });
+  assert.equal(outside.statusCode, 403);
+
+  const mine = await call(limited, 'POST', '/api/finders', { title: 'My Time', brand: 'TimePhoria' });
+  assert.equal(mine.statusCode, 201, mine.body);
+  const theirs = await call(boss, 'POST', '/api/finders', { title: 'Boss Time', brand: 'TimePhoria' });
+  assert.equal(theirs.statusCode, 201, theirs.body);
+
+  const list = await call(limited, 'GET', '/api/finders?pageSize=50');
+  const titles = list.json().items.map((item: { title: string }) => item.title);
+  assert.deepEqual(titles, ['My Time']);
+  assert.deepEqual(list.json().brands, ['TimePhoria']);
+  assert.equal((await call(limited, 'GET', `/api/finders/${theirs.json().finder.id}`)).statusCode, 404);
+  assert.equal((await call(limited, 'GET', `/api/finders/${mine.json().finder.id}`)).statusCode, 200);
+});
+
 test('public events ingest', async () => {
   const base = {
     finderCode: 'demo',

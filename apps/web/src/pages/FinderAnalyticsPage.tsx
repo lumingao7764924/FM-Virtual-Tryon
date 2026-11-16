@@ -14,17 +14,23 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useI18n, type Locale, type MessageKey } from '@/i18n';
 import { downloadText, type FinderDetail } from '@/lib/finders';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
-const RANGES = [
-  { value: '0', label: '今天' },
-  { value: '6', label: '近 7 天' },
-  { value: '29', label: '近 30 天' },
-  { value: '89', label: '近 90 天' },
-  { value: '364', label: '近一年' },
+const RANGES: { value: string; label: MessageKey }[] = [
+  { value: '0', label: 'stats.range.0' },
+  { value: '6', label: 'stats.range.6' },
+  { value: '29', label: 'stats.range.29' },
+  { value: '89', label: 'stats.range.89' },
+  { value: '364', label: 'stats.range.364' },
 ];
+
+const WEEKDAYS: Record<Locale, string[]> = {
+  zh: ['一', '二', '三', '四', '五', '六', '日'],
+  en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+};
 
 type RangeQuery = { kind: 'days'; days: string } | { kind: 'custom'; from: string; to: string };
 
@@ -72,12 +78,18 @@ function RangePicker({
   disabled?: boolean;
   onChange: (from: string, to: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(monthOf(to || today));
   const [start, setStart] = useState<string | null>(null);
   const earliest = shiftDate(today, -STATS_MAX_DAYS);
   const cells = monthCells(cursor);
-  const week = ['一', '二', '三', '四', '五', '六', '日'];
+  const [year, month] = cursor.split('-').map(Number);
+  const monthLabel = new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en', {
+    year: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, 1)));
 
   function pick(date: string) {
     if (date > today || date < earliest) return;
@@ -110,28 +122,28 @@ function RangePicker({
       <PopoverTrigger asChild>
         <Button variant="outline" className="h-8 w-56 justify-start px-2.5 font-normal" disabled={disabled}>
           <CalendarRange />
-          {from} 至 {to}
+          {t('stats.through', { from, to })}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-3" align="start">
         <div className="mb-2 flex items-center justify-between">
-          <Button variant="ghost" size="icon" className="size-8" onClick={() => setCursor(shiftMonth(cursor, -1))} aria-label="上个月">
+          <Button variant="ghost" size="icon" className="size-8" onClick={() => setCursor(shiftMonth(cursor, -1))} aria-label={t('stats.prevMonth')}>
             <ChevronLeft />
           </Button>
-          <span className="text-sm font-medium">{cursor.replace('-', '年')}月</span>
+          <span className="text-sm font-medium">{monthLabel}</span>
           <Button
             variant="ghost"
             size="icon"
             className="size-8"
             disabled={cursor >= monthOf(today)}
             onClick={() => setCursor(shiftMonth(cursor, 1))}
-            aria-label="下个月"
+            aria-label={t('stats.nextMonth')}
           >
             <ChevronRight />
           </Button>
         </div>
         <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-          {week.map((day) => (
+          {WEEKDAYS[locale].map((day) => (
             <span key={day} className="flex h-7 w-10 items-center justify-center">
               {day}
             </span>
@@ -161,44 +173,46 @@ function RangePicker({
             );
           })}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{start ? '再点一天作为结束' : '先点开始日期，再点结束日期'}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{start ? t('stats.pickEnd') : t('stats.pickStart')}</p>
       </PopoverContent>
     </Popover>
   );
 }
 const ALL = '__all__';
 
-const LABELS: Record<string, string> = {
-  '(direct)': '未标渠道',
-  mobile: '手机',
-  tablet: '平板',
-  desktop: '电脑',
-  ios: 'iOS',
-  android: 'Android',
-  windows: 'Windows',
-  macos: 'macOS',
-  other: '其他',
-  cool: '冷调',
-  neutral: '中性',
-  warm: '暖调',
-  unsure: '不确定',
+const LABEL_KEY: Record<string, MessageKey> = {
+  '(direct)': 'stats.label.direct',
+  mobile: 'stats.label.mobile',
+  tablet: 'stats.label.tablet',
+  desktop: 'stats.label.desktop',
+  other: 'stats.label.other',
+  cool: 'stats.label.cool',
+  neutral: 'stats.label.neutral',
+  warm: 'stats.label.warm',
+  unsure: 'stats.label.unsure',
 };
 
-const label = (key: string) => LABELS[key] ?? key;
+const FUNNEL_KEY: Record<string, MessageKey> = {
+  page_view: 'stats.funnel.page',
+  camera_granted: 'stats.funnel.camera',
+  scan_complete: 'stats.funnel.scan',
+  result_shown: 'stats.funnel.result',
+  link_click: 'stats.funnel.link',
+};
 
-const FEEDBACK_LABEL = { too_light: '偏浅', just_right: '刚好', too_deep: '偏深' } as const;
+const FEEDBACK_KEY = { too_light: 'stats.light', just_right: 'stats.right', too_deep: 'stats.deep' } as const;
 
-function feedbackAdvice(stats: FinderStats): string | null {
+function feedbackAdvice(stats: FinderStats): MessageKey | null {
   const { too_light: light, just_right: right, too_deep: deep } = stats.totals.feedback;
   const total = light + right + deep;
   if (total < 20) return null;
-  if (deep / total > 0.35 && deep > light * 1.5) return '「偏深」反馈明显偏多，可以在「匹配阈值」里把深浅档位往正数（偏浅）调 1–2 档。';
-  if (light / total > 0.35 && light > deep * 1.5) return '「偏浅」反馈明显偏多，可以在「匹配阈值」里把深浅档位往负数（偏深）调 1–2 档。';
+  if (deep / total > 0.35 && deep > light * 1.5) return 'stats.advice.deep';
+  if (light / total > 0.35 && light > deep * 1.5) return 'stats.advice.light';
   return null;
 }
 
-function shadesCsv(stats: FinderStats): string {
-  const header = ['色号', 'SKU', '色值', '最佳推荐次数', '出现次数', '被点选', '跳转点击', '偏浅', '刚好', '偏深'];
+function shadesCsv(stats: FinderStats, t: (key: MessageKey) => string): string {
+  const header = [t('stats.shade'), 'SKU', t('stats.hex'), t('stats.best'), t('stats.shown'), t('stats.selected'), t('stats.jumps'), t('stats.light'), t('stats.right'), t('stats.deep')];
   const rows = stats.shades.map((s) => [
     s.name,
     s.sku,
@@ -216,6 +230,7 @@ function shadesCsv(stats: FinderStats): string {
 }
 
 function DailyLine({ days }: { days: DailyStat[] }) {
+  const { t } = useI18n();
   const box = useRef<HTMLDivElement>(null);
   const [hover, setHover] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
@@ -243,7 +258,7 @@ function DailyLine({ days }: { days: DailyStat[] }) {
   return (
     <div ref={box} className="relative w-full">
       {width > 0 ? (
-      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block w-full" role="img" aria-label="每日打开次数">
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="block w-full" role="img" aria-label={t('stats.dailyAria')}>
         {[0, max].map((tick) => (
           <g key={tick}>
             <line x1={pad.l} x2={width - pad.r} y1={yAt(tick)} y2={yAt(tick)} className="stroke-border" strokeWidth="1" />
@@ -265,7 +280,7 @@ function DailyLine({ days }: { days: DailyStat[] }) {
               onMouseEnter={() => setHover(index)}
               onMouseLeave={() => setHover(null)}
             >
-              <title>{`${day.date} 打开 ${day.sessions}`}</title>
+              <title>{t('stats.dailyTip', { date: day.date, count: day.sessions })}</title>
             </rect>
             {index % labelEvery === 0 || index === days.length - 1 ? (
               <text x={xAt(index)} y={height - 8} textAnchor="middle" className="fill-muted-foreground text-[11px]">
@@ -283,7 +298,7 @@ function DailyLine({ days }: { days: DailyStat[] }) {
           className="pointer-events-none absolute top-0 rounded border bg-background px-2 py-1 text-xs shadow-sm"
           style={{ left: `${(xAt(hover) / width) * 100}%`, transform: 'translateX(-50%)' }}
         >
-          {active.date} · 打开 {formatNumber(active.sessions)}
+          {t('stats.dailyTip', { date: active.date, count: formatNumber(active.sessions) })}
         </p>
       ) : null}
     </div>
@@ -293,6 +308,7 @@ function DailyLine({ days }: { days: DailyStat[] }) {
 export function FinderAnalyticsPage() {
   const { id = '' } = useParams();
   const nav = useNavigate();
+  const { t } = useI18n();
   const [detail, setDetail] = useState<FinderDetail | null>(null);
   const [stats, setStats] = useState<FinderStats | null>(null);
   const [query, setQuery] = useState<RangeQuery>({ kind: 'days', days: '6' });
@@ -347,15 +363,15 @@ export function FinderAnalyticsPage() {
       <PageHeader
         title={
           <div className="flex min-w-0 items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => nav('/finders')} aria-label="返回列表">
+            <Button variant="ghost" size="icon" onClick={() => nav('/finders')} aria-label={t('stats.back')}>
               <ArrowLeft />
             </Button>
-            <h1 className="truncate text-2xl font-semibold tracking-tight">{detail?.finder.title ?? '数据'}</h1>
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{detail?.finder.title ?? t('stats.fallbackTitle')}</h1>
           </div>
         }
         actions={
           <Button variant="outline" size="sm" onClick={() => nav(`/finders/${id}`)}>
-            <Pencil /> 编辑配置
+            <Pencil /> {t('stats.edit')}
           </Button>
         }
       >
@@ -373,10 +389,10 @@ export function FinderAnalyticsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {query.kind === 'custom' ? <SelectItem value="custom">自定义</SelectItem> : null}
+            {query.kind === 'custom' ? <SelectItem value="custom">{t('stats.custom')}</SelectItem> : null}
             {RANGES.map((item) => (
               <SelectItem key={item.value} value={item.value}>
-                {item.label}
+                {t(item.label)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -395,20 +411,18 @@ export function FinderAnalyticsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>全部渠道</SelectItem>
+            <SelectItem value={ALL}>{t('stats.allChannels')}</SelectItem>
             {stats?.channels.map((key) => (
               <SelectItem key={key} value={key}>
-                {label(key)}
+                {LABEL_KEY[key] ? t(LABEL_KEY[key]) : key}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="icon" onClick={() => void load()} disabled={loading} aria-label="刷新">
+        <Button variant="outline" size="icon" onClick={() => void load()} disabled={loading} aria-label={t('stats.refresh')}>
           <RefreshCw className={loading ? 'animate-spin' : undefined} />
         </Button>
-        <InfoHint title="统计口径">
-          当天按服务器 UTC 日期计算，和入库日期一致，不看浏览器时间。访客 = 同一台设备浏览器；会话 = 一次打开页面（关掉标签页后重新开算新会话）。漏斗按会话去重。深浅反馈记在当次「最佳匹配」色号上。
-        </InfoHint>
+        <InfoHint title={t('stats.methodTitle')}>{t('stats.method')}</InfoHint>
       </div>
       </div>
 
@@ -422,24 +436,24 @@ export function FinderAnalyticsPage() {
       {stats && totals ? (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <KpiCard label="访客" value={formatNumber(totals.visitors)} sub={`${formatNumber(totals.sessions)} 次打开`} />
+            <KpiCard label={t('stats.visitors')} value={formatNumber(totals.visitors)} sub={t('stats.opens', { count: formatNumber(totals.sessions) })} />
             <KpiCard
-              label="完成扫脸"
+              label={t('stats.scans')}
               value={formatNumber(totals.scans)}
-              sub={totals.medianScanMs != null ? `中位耗时 ${(totals.medianScanMs / 1000).toFixed(1)} 秒` : undefined}
+              sub={totals.medianScanMs != null ? t('stats.median', { seconds: (totals.medianScanMs / 1000).toFixed(1) }) : undefined}
             />
-            <KpiCard label="跳转点击" value={formatNumber(totals.linkClicks)} sub={`点击率 ${formatPercent(totals.linkClicks, totals.results)}（/推荐次数）`} />
+            <KpiCard label={t('stats.clicks')} value={formatNumber(totals.linkClicks)} sub={t('stats.clickRate', { rate: formatPercent(totals.linkClicks, totals.results) })} />
             <KpiCard
-              label="深浅反馈"
+              label={t('stats.feedback')}
               value={formatNumber(feedbackTotal)}
-              sub={`刚好 ${formatPercent(totals.feedback.just_right, feedbackTotal)} · 拒绝相机 ${totals.cameraDenied}`}
+              sub={t('stats.feedbackSub', { rate: formatPercent(totals.feedback.just_right, feedbackTotal), count: totals.cameraDenied })}
             />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">转化漏斗</CardTitle>
+                <CardTitle className="text-base">{t('stats.funnel')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {stats.funnel.map((step, index) => {
@@ -447,10 +461,10 @@ export function FinderAnalyticsPage() {
                   return (
                     <div key={step.key} className="space-y-1">
                       <div className="flex justify-between text-sm">
-                        <span>{step.label}</span>
+                        <span>{FUNNEL_KEY[step.key] ? t(FUNNEL_KEY[step.key]) : step.label}</span>
                         <span className="tabular-nums text-muted-foreground">
                           {formatNumber(step.sessions)}
-                          {index ? ` · 上一步 ${formatPercent(step.sessions, prev)}` : ''}
+                          {index ? ` · ${t('stats.prevStep', { rate: formatPercent(step.sessions, prev) })}` : ''}
                         </span>
                       </div>
                       <div className="h-6 rounded bg-muted">
@@ -464,32 +478,32 @@ export function FinderAnalyticsPage() {
                     </div>
                   );
                 })}
-                <p className="text-xs text-muted-foreground">顾客可能在隐私确认或相机权限处离开，所以「开启相机」通常低于「打开页面」。</p>
+                <p className="text-xs text-muted-foreground">{t('stats.funnelNote')}</p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">深浅反馈</CardTitle>
+                <CardTitle className="text-base">{t('stats.feedback')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <FeedbackBar counts={totals.feedback} className="h-4" />
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  {(Object.keys(FEEDBACK_LABEL) as (keyof typeof FEEDBACK_LABEL)[]).map((key) => (
+                  {(Object.keys(FEEDBACK_KEY) as (keyof typeof FEEDBACK_KEY)[]).map((key) => (
                     <div key={key} className="rounded-md border p-2">
                       <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
                         <span className={`size-2 rounded-full ${FEEDBACK_COLORS[key]}`} />
-                        {FEEDBACK_LABEL[key]}
+                        {t(FEEDBACK_KEY[key])}
                       </div>
                       <p className="text-lg font-semibold tabular-nums">{totals.feedback[key]}</p>
                       <p className="text-xs text-muted-foreground">{formatPercent(totals.feedback[key], feedbackTotal)}</p>
                     </div>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">关闭未选：{totals.feedbackDismissed} 次</p>
+                <p className="text-xs text-muted-foreground">{t('stats.dismissed', { count: totals.feedbackDismissed })}</p>
                 {advice ? (
                   <Alert>
-                    <AlertDescription>{advice}</AlertDescription>
+                    <AlertDescription>{t(advice)}</AlertDescription>
                   </Alert>
                 ) : null}
               </CardContent>
@@ -498,7 +512,7 @@ export function FinderAnalyticsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">每日趋势（打开次数）</CardTitle>
+              <CardTitle className="text-base">{t('stats.daily')}</CardTitle>
             </CardHeader>
             <CardContent>
               <DailyLine days={stats.daily} />
@@ -507,17 +521,17 @@ export function FinderAnalyticsPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-base">色号表现</CardTitle>
+              <CardTitle className="text-base">{t('stats.shades')}</CardTitle>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={!stats.shades.length}
                 onClick={() => {
-                  downloadText(shadesCsv(stats), `${detail?.finder.code ?? id}-shades-${stats.from}_${stats.to}.csv`, 'text/csv');
-                  toast({ title: '已导出', variant: 'success' });
+                  downloadText(shadesCsv(stats, t), `${detail?.finder.code ?? id}-shades-${stats.from}_${stats.to}.csv`, 'text/csv');
+                  toast({ title: t('stats.exported'), variant: 'success' });
                 }}
               >
-                <Download /> 导出 CSV
+                <Download /> {t('stats.export')}
               </Button>
             </CardHeader>
             <CardContent className="p-0">
@@ -525,12 +539,12 @@ export function FinderAnalyticsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-40">色号</TableHead>
-                      <TableHead className="text-right">最佳推荐</TableHead>
-                      <TableHead className="text-right">出现</TableHead>
-                      <TableHead className="text-right">点选</TableHead>
-                      <TableHead className="text-right">跳转</TableHead>
-                      <TableHead className="min-w-44">反馈（偏浅 / 刚好 / 偏深）</TableHead>
+                      <TableHead className="min-w-40">{t('stats.shade')}</TableHead>
+                      <TableHead className="text-right">{t('stats.best')}</TableHead>
+                      <TableHead className="text-right">{t('stats.shown')}</TableHead>
+                      <TableHead className="text-right">{t('stats.selected')}</TableHead>
+                      <TableHead className="text-right">{t('stats.jumps')}</TableHead>
+                      <TableHead className="min-w-44">{t('stats.feedbackCol')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -563,7 +577,7 @@ export function FinderAnalyticsPage() {
                     {!stats.shades.length ? (
                       <TableRow>
                         <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                          这段时间还没有推荐记录
+                          {t('stats.noShades')}
                         </TableCell>
                       </TableRow>
                     ) : null}
@@ -574,11 +588,11 @@ export function FinderAnalyticsPage() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <BreakdownCard title="渠道（打开次数）" rows={stats.byChannel.map((row) => ({ key: row.key, label: label(row.key), value: row.sessions }))} />
-            <BreakdownCard title="跳转按钮（点击）" rows={stats.buttons.map((row) => ({ key: row.buttonId, label: row.label, value: row.clicks }))} />
-            <BreakdownCard title="顾客选择的色调" rows={stats.undertones.map((row) => ({ key: row.key, label: label(row.key), value: row.count }))} />
-            <BreakdownCard title="设备" rows={stats.byDevice.map((row) => ({ key: row.key, label: label(row.key), value: row.sessions }))} />
-            <BreakdownCard title="系统" rows={stats.byOs.map((row) => ({ key: row.key, label: label(row.key), value: row.sessions }))} />
+            <BreakdownCard title={t('stats.byChannel')} rows={stats.byChannel.map((row) => ({ key: row.key, label: LABEL_KEY[row.key] ? t(LABEL_KEY[row.key]) : row.key, value: row.sessions }))} />
+            <BreakdownCard title={t('stats.byButton')} rows={stats.buttons.map((row) => ({ key: row.buttonId, label: row.label, value: row.clicks }))} />
+            <BreakdownCard title={t('stats.byTone')} rows={stats.undertones.map((row) => ({ key: row.key, label: LABEL_KEY[row.key] ? t(LABEL_KEY[row.key]) : row.key, value: row.count }))} />
+            <BreakdownCard title={t('stats.byDevice')} rows={stats.byDevice.map((row) => ({ key: row.key, label: LABEL_KEY[row.key] ? t(LABEL_KEY[row.key]) : row.key, value: row.sessions }))} />
+            <BreakdownCard title={t('stats.byOs')} rows={stats.byOs.map((row) => ({ key: row.key, label: LABEL_KEY[row.key] ? t(LABEL_KEY[row.key]) : row.key, value: row.sessions }))} />
           </div>
         </>
       ) : null}

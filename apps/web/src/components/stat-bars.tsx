@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { formatNumber, formatPercent } from '@/lib/format';
 
@@ -16,7 +17,7 @@ export function KpiCard({ label, value, sub }: { label: string; value: ReactNode
 export function BarList({
   rows,
   total,
-  empty = '暂无数据',
+  empty,
   barClassName,
 }: {
   rows: { key: string; label: ReactNode; value: number; extra?: ReactNode }[];
@@ -24,7 +25,9 @@ export function BarList({
   empty?: string;
   barClassName?: string;
 }) {
-  if (!rows.length) return <p className="py-4 text-center text-sm text-muted-foreground">{empty}</p>;
+  const { t } = useI18n();
+  const emptyLabel = empty ?? t('stats.empty');
+  if (!rows.length) return <p className="py-4 text-center text-sm text-muted-foreground">{emptyLabel}</p>;
   const max = Math.max(...rows.map((row) => row.value), 1);
   const sum = total ?? rows.reduce((acc, row) => acc + row.value, 0);
   return (
@@ -64,12 +67,13 @@ export function FeedbackBar({
   counts: Record<keyof typeof FEEDBACK_COLORS, number>;
   className?: string;
 }) {
+  const { t } = useI18n();
   const total = counts.too_light + counts.just_right + counts.too_deep;
   if (!total) return <div className={cn('h-2 rounded-full bg-muted', className)} />;
   return (
     <div
       className={cn('flex h-2 overflow-hidden rounded-full bg-muted', className)}
-      title={`偏浅 ${counts.too_light} / 刚好 ${counts.just_right} / 偏深 ${counts.too_deep}`}
+      title={t('stats.feedbackBar', { light: counts.too_light, right: counts.just_right, deep: counts.too_deep })}
     >
       {(Object.keys(FEEDBACK_COLORS) as (keyof typeof FEEDBACK_COLORS)[]).map((key) =>
         counts[key] ? (

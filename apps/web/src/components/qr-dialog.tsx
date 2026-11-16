@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Copy, Download, ExternalLink, Undo2 } from 'lucide-react';
 import { apiFetch, errorMessage } from '@/api';
 import { toast } from '@/components/toast';
+import { useI18n, type MessageKey } from '@/i18n';
 import { InfoHint } from '@/components/info-hint';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,14 @@ interface PreviewPass {
   image: string;
 }
 
+const CHANNEL_KEY: Record<(typeof CHANNEL_PRESETS)[number]['value'], MessageKey> = {
+  none: 'qr.channel.none',
+  amazon: 'qr.channel.amazon',
+  tiktok: 'qr.channel.tiktok',
+  offline: 'qr.channel.offline',
+  custom: 'qr.channel.custom',
+};
+
 function remainLabel(expiresAt: number, now: number): string {
   const left = Math.max(0, expiresAt - now);
   const minutes = Math.floor(left / 60000);
@@ -35,6 +44,7 @@ function remainLabel(expiresAt: number, now: number): string {
 }
 
 export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; onOpenChange: (open: boolean) => void }) {
+  const { t } = useI18n();
   const [preset, setPreset] = useState<string>('none');
   const [custom, setCustom] = useState('');
   const [preview, setPreview] = useState('');
@@ -67,7 +77,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
           setNow(Date.now());
         }
       } catch (err) {
-        if (!cancelled) toast({ title: '预览码生成失败', description: errorMessage(err), variant: 'destructive' });
+        if (!cancelled) toast({ title: t('qr.issueFail'), description: errorMessage(err), variant: 'destructive' });
       } finally {
         if (!cancelled) setIssuing(false);
       }
@@ -99,7 +109,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
       await action();
       if (success) toast({ title: success, variant: 'success' });
     } catch (err) {
-      toast({ title: '操作失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('qr.actionFail'), description: errorMessage(err), variant: 'destructive' });
     }
   }
 
@@ -114,7 +124,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
       setPass({ url: issued.url, expiresAt: Date.parse(issued.expiresAt), image });
       setNow(Date.now());
     } catch (err) {
-      toast({ title: '预览码生成失败', description: errorMessage(err), variant: 'destructive' });
+      toast({ title: t('qr.issueFail'), description: errorMessage(err), variant: 'destructive' });
     } finally {
       setIssuing(false);
     }
@@ -124,31 +134,29 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
     <Dialog open={target !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{previewMode ? '预览二维码' : '二维码'} · {target?.title}</DialogTitle>
-          <DialogDescription className="break-all font-mono text-xs">{pass ? pass.url : previewMode ? '正在生成预览码' : url}</DialogDescription>
+          <DialogTitle>{previewMode ? t('qr.previewTitle') : t('qr.title')} · {target?.title}</DialogTitle>
+          <DialogDescription className="break-all font-mono text-xs">{pass ? pass.url : previewMode ? t('qr.issuing') : url}</DialogDescription>
         </DialogHeader>
 
         {pass ? (
           <Alert>
             <AlertDescription>
               {expired
-                ? '这张预览码已过期。正式二维码不受影响。'
-                : `非正式预览，剩余 ${remainLabel(pass.expiresAt, now)}。未启用也能扫码采集，过期后失效。不会写入数据库。`}
+                ? t('qr.expired')
+                : t('qr.previewBody', { time: remainLabel(pass.expiresAt, now) })}
             </AlertDescription>
           </Alert>
         ) : previewMode ? null : target && !target.active ? (
           <Alert>
-            <AlertDescription>该项目当前已停用，正式二维码扫码会提示不可用。预览码可以在停用时试用 10 分钟。</AlertDescription>
+            <AlertDescription>{t('qr.disabled')}</AlertDescription>
           </Alert>
         ) : null}
 
         {previewMode ? null : (
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
-              <Label className="mb-0 leading-5">渠道</Label>
-              <InfoHint title="渠道参数">
-                同一个项目可以给不同渠道各印一张码（链接带 ?ch=渠道），数据页可以按渠道拆分。二维码内容不同，但都指向同一套配置。
-              </InfoHint>
+              <Label className="mb-0 leading-5">{t('qr.channel')}</Label>
+              <InfoHint title={t('qr.channelHintTitle')}>{t('qr.channelHint')}</InfoHint>
             </div>
             <div className="flex gap-2">
               <Select value={preset} onValueChange={setPreset}>
@@ -158,7 +166,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
                 <SelectContent>
                   {CHANNEL_PRESETS.map((item) => (
                     <SelectItem key={item.value} value={item.value}>
-                      {item.label}
+                      {t(CHANNEL_KEY[item.value])}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -167,7 +175,7 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
                 <Input
                   value={custom}
                   onChange={(e) => setCustom(e.target.value.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32))}
-                  placeholder="如 walmart、event01"
+                  placeholder={t('qr.customPlaceholder')}
                 />
               ) : null}
             </div>
@@ -176,9 +184,9 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
 
         <div className="flex justify-center rounded-lg border bg-white p-3">
           {pass ? (
-            <img src={pass.image} alt="预览二维码" className={expired ? 'size-60 opacity-30' : 'size-60'} />
+            <img src={pass.image} alt={t('qr.altPreview')} className={expired ? 'size-60 opacity-30' : 'size-60'} />
           ) : preview && !previewMode ? (
-            <img src={preview} alt="二维码" className="size-60" />
+            <img src={preview} alt={t('qr.alt')} className="size-60" />
           ) : (
             <div className="size-60" />
           )}
@@ -186,14 +194,14 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
 
         {pass ? (
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" disabled={expired} onClick={() => run(() => copyText(pass.url), '预览链接已复制')}>
-              <Copy /> 复制链接
+            <Button variant="outline" disabled={expired} onClick={() => run(() => copyText(pass.url), t('qr.copiedPreview'))}>
+              <Copy /> {t('qr.copy')}
             </Button>
             <Button variant="outline" onClick={() => void issuePreview()} disabled={issuing}>
-              <ExternalLink /> {expired ? '重新生成' : '换一张'}
+              <ExternalLink /> {expired ? t('qr.regenerate') : t('qr.refresh')}
             </Button>
             <Button variant="outline" className="col-span-2" onClick={() => setPass(null)}>
-              <Undo2 /> 返回正式二维码
+              <Undo2 /> {t('qr.back')}
             </Button>
           </div>
         ) : previewMode ? null : (
@@ -205,13 +213,13 @@ export function QrDialog({ target, onOpenChange }: { target: QrTarget | null; on
               variant="outline"
               onClick={() => run(async () => downloadText(await qrSvg(url), `${fileBase}.svg`, 'image/svg+xml'))}
             >
-              <Download /> SVG（印刷）
+              <Download /> {t('qr.svg')}
             </Button>
-            <Button variant="outline" onClick={() => run(() => copyText(url), '链接已复制')}>
-              <Copy /> 复制链接
+            <Button variant="outline" onClick={() => run(() => copyText(url), t('qr.copied'))}>
+              <Copy /> {t('qr.copy')}
             </Button>
             <Button variant="outline" onClick={() => void issuePreview()} disabled={issuing || !target}>
-              <ExternalLink /> 打开预览
+              <ExternalLink /> {t('qr.openPreview')}
             </Button>
           </div>
         )}

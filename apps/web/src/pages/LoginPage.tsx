@@ -4,6 +4,7 @@ import type { AuthConfig, SessionInfo } from '@tryon/shared';
 import { apiFetch, errorMessage } from '@/api';
 import { useAuth } from '@/hooks/use-auth';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useI18n } from '@/i18n';
 import { Card, CardContent } from '@/components/ui/card';
 
 const GSI_SRC = 'https://accounts.google.com/gsi/client';
@@ -14,7 +15,7 @@ function loadGoogleScript(): Promise<void> {
     const existing = document.querySelector<HTMLScriptElement>(`script[src="${GSI_SRC}"]`);
     const script = existing ?? document.createElement('script');
     script.addEventListener('load', () => resolve(), { once: true });
-    script.addEventListener('error', () => reject(new Error('Google 登录脚本加载失败，请检查网络')), { once: true });
+    script.addEventListener('error', () => reject(new Error('script')), { once: true });
     if (!existing) {
       script.src = GSI_SRC;
       script.async = true;
@@ -29,6 +30,7 @@ function safeNext(raw: string | null): string {
 
 export function LoginPage() {
   const { session, loading, setSession } = useAuth();
+  const { locale, t } = useI18n();
   const [params] = useSearchParams();
   const [config, setConfig] = useState<AuthConfig | null>(null);
   const [error, setError] = useState('');
@@ -39,8 +41,8 @@ export function LoginPage() {
   useEffect(() => {
     apiFetch<AuthConfig>('/api/auth/config')
       .then(setConfig)
-      .catch((err) => setError(`无法连接后端：${errorMessage(err)}`));
-  }, []);
+      .catch((err) => setError(t('login.backendError', { message: errorMessage(err) })));
+  }, [t]);
 
   useEffect(() => {
     const clientId = config?.googleClientId;
@@ -49,6 +51,7 @@ export function LoginPage() {
     loadGoogleScript()
       .then(() => {
         if (cancelled || !googleButton.current || !window.google) return;
+        googleButton.current.replaceChildren();
         window.google.accounts.id.initialize({
           client_id: clientId,
           ux_mode: 'popup',
@@ -74,14 +77,14 @@ export function LoginPage() {
           text: 'signin_with',
           shape: 'pill',
           width: 300,
-          locale: 'zh-CN',
+          locale: locale === 'zh' ? 'zh-CN' : 'en',
         });
       })
-      .catch((err) => setError(errorMessage(err)));
+      .catch((err) => setError(err instanceof Error && err.message === 'script' ? t('login.scriptError') : errorMessage(err)));
     return () => {
       cancelled = true;
     };
-  }, [config?.googleClientId, setSession]);
+  }, [config?.googleClientId, locale, setSession, t]);
 
   if (!loading && session) return <Navigate to={next} replace />;
 
@@ -104,7 +107,7 @@ export function LoginPage() {
             </div>
           ) : config ? (
             <p className="text-center text-sm text-muted-foreground">
-              尚未配置 Google 登录（GOOGLE_CLIENT_ID）。
+              {t('login.missingClient')}
             </p>
           ) : null}
         </CardContent>
