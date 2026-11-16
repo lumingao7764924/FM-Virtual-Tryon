@@ -23,10 +23,8 @@ const NAV = [
 function BrandMark() {
   return (
     <div className="flex items-center gap-2">
-      <div className="flex size-7 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
-        T
-      </div>
-      <p className="text-sm font-semibold">FM Try-On</p>
+      <img src="/favicon.png" alt="" className="size-8" />
+      <p className="text-sm font-semibold">FM Virtual Try-On</p>
     </div>
   );
 }
