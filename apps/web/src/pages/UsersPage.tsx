@@ -4,6 +4,7 @@ import { FINDER_BRANDS, type AdminRole, type AdminUser, type AdminUserStatus, ty
 import { apiFetch, errorMessage } from '@/api';
 import { useAuth } from '@/hooks/use-auth';
 import { InfoHint } from '@/components/info-hint';
+import { ListPager } from '@/components/list-pager';
 import { PageHeader } from '@/components/page-header';
 import { toast } from '@/components/toast';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +43,8 @@ export function UsersPage() {
   const { session } = useAuth();
   const { t } = useI18n();
   const [items, setItems] = useState<UserItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [removing, setRemoving] = useState<UserItem | null>(null);
 
@@ -68,8 +71,12 @@ export function UsersPage() {
     }
   }
 
+  const pages = Math.max(1, Math.ceil(items.length / pageSize));
+  const current = Math.min(page, pages);
+  const rows = items.slice((current - 1) * pageSize, current * pageSize);
+
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-4 md:p-6">
       <PageHeader
         title={t('users.title')}
         actions={
@@ -81,9 +88,10 @@ export function UsersPage() {
         <InfoHint title={t('users.hintTitle')}>{t('users.hint')}</InfoHint>
       </PageHeader>
 
-      <Card className="overflow-hidden p-0">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        <div className="min-h-0 flex-1 overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-card">
             <TableRow>
               <TableHead>{t('users.email')}</TableHead>
               <TableHead>{t('users.role')}</TableHead>
@@ -94,7 +102,7 @@ export function UsersPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((user) => (
+            {rows.map((user) => (
               <TableRow key={user.email}>
                 <TableCell className="font-medium">{user.email}</TableCell>
                 <TableCell>
@@ -139,6 +147,18 @@ export function UsersPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
+        <ListPager
+          className="shrink-0 border-t px-3 py-2"
+          page={current}
+          pageSize={pageSize}
+          total={items.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </Card>
 
       <UserDialog editing={editing} onClose={() => setEditing(null)} onSaved={load} />

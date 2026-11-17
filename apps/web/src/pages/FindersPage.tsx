@@ -19,6 +19,7 @@ import { apiFetch, errorMessage } from '@/api';
 import { useAuth } from '@/hooks/use-auth';
 import { BrandSelect } from '@/components/brand-select';
 import { InfoHint } from '@/components/info-hint';
+import { ListPager } from '@/components/list-pager';
 import { PageHeader } from '@/components/page-header';
 import { QrDialog, type QrTarget } from '@/components/qr-dialog';
 import { StatusBadge } from '@/components/status-badge';
@@ -50,7 +51,6 @@ import { useI18n } from '@/i18n';
 
 type ListResponse = PaginatedListResponse<FinderSummary> & { brands: string[] };
 
-const PAGE_SIZE = 20;
 const ALL = '__all__';
 
 export function FindersPage() {
@@ -64,6 +64,7 @@ export function FindersPage() {
   const [status, setStatus] = useState(ALL);
   const [brand, setBrand] = useState(ALL);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [qrTarget, setQrTarget] = useState<QrTarget | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [removing, setRemoving] = useState<FinderSummary | null>(null);
@@ -72,7 +73,7 @@ export function FindersPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
       if (query) params.set('q', query);
       if (status !== ALL) params.set('status', status);
       if (brand !== ALL) params.set('brand', brand);
@@ -82,7 +83,7 @@ export function FindersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, query, status, brand, t]);
+  }, [page, pageSize, query, status, brand, t]);
 
   useEffect(() => {
     void load();
@@ -173,10 +174,8 @@ export function FindersPage() {
     setQuery(q.trim());
   }
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
-
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="flex h-full min-h-0 flex-col gap-4 p-4 md:p-6">
       <PageHeader
         title={t('finders.title')}
         actions={
@@ -230,9 +229,10 @@ export function FindersPage() {
         </Select>
       </div>
 
-      <Card className="overflow-hidden p-0">
+      <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-0">
+        <div className="min-h-0 flex-1 overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 [&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-card">
             <TableRow>
               <TableHead>{t('finders.product')}</TableHead>
               <TableHead className="hidden sm:table-cell">{t('finders.shades')}</TableHead>
@@ -321,21 +321,19 @@ export function FindersPage() {
             ) : null}
           </TableBody>
         </Table>
-      </Card>
-
-      {data && data.total > PAGE_SIZE ? (
-        <div className="flex items-center justify-end gap-2 text-sm">
-          <span className="text-muted-foreground">
-            {t('finders.pager', { total: data.total, page, pages: totalPages })}
-          </span>
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            {t('finders.prev')}
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
-            {t('finders.next')}
-          </Button>
         </div>
-      ) : null}
+        <ListPager
+          className="shrink-0 border-t px-3 py-2"
+          page={page}
+          pageSize={pageSize}
+          total={data?.total ?? 0}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      </Card>
 
       <QrDialog target={qrTarget} onOpenChange={(open) => !open && setQrTarget(null)} />
       <Dialog open={removing !== null} onOpenChange={(open) => !open && !removingBusy && setRemoving(null)}>

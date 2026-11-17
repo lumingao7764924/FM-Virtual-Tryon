@@ -92,9 +92,7 @@ export function LoginPage() {
     <div className="flex min-h-svh items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-sm">
         <CardContent className="space-y-4 py-8">
-          <div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-            T
-          </div>
+          <img src="/favicon.png" alt="SKINTIFIC" className="mx-auto size-10" />
           {error ? (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
