@@ -98,12 +98,13 @@ export function normalizeBrandScope(value: unknown): FinderBrand[] {
   return [...new Set(brands)];
 }
 
-/** Brand list and ownership. Empty brands means every brand. */
+/** Brand list and ownership. Empty brands means every brand. A brand that was later removed still shows collections this person created. */
 export function canAccessFinder(
   access: { email: string; brands: readonly string[]; scope: ProjectScope },
   finder: { brand: string; createdBy: string }
 ): boolean {
-  if (access.brands.length > 0 && !access.brands.includes(finder.brand)) return false;
+  const inBrand = access.brands.length === 0 || access.brands.includes(finder.brand);
+  if (!inBrand) return finder.createdBy === access.email;
   if (access.scope === 'own' && finder.createdBy !== access.email) return false;
   return true;
 }

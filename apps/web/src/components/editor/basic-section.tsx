@@ -1,3 +1,4 @@
+import { FINDER_BRANDS, type FinderBrand } from '@tryon/shared';
 import { useAuth } from '@/hooks/use-auth';
 import { BrandSelect } from '@/components/brand-select';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,10 @@ import { Field, Section, errorAt, type SectionProps } from './shared';
 export function BasicSection({ draft, update, errors, readOnly, scanUrl }: SectionProps & { scanUrl: string }) {
   const { session } = useAuth();
   const { t } = useI18n();
+  const scoped = session?.brands ?? [];
+  const current = FINDER_BRANDS.find((brand) => brand === draft.brand);
+  const brandOptions: readonly FinderBrand[] =
+    scoped.length === 0 || !current || scoped.includes(current) ? scoped : [...scoped, current];
   return (
     <Section title={t('editor.tab.basic')} description={t('basic.desc')}>
       <div className="grid gap-3 md:grid-cols-2">
@@ -24,7 +29,7 @@ export function BasicSection({ draft, update, errors, readOnly, scanUrl }: Secti
             id="f-brand"
             value={draft.brand}
             disabled={readOnly}
-            brands={session?.brands}
+            brands={brandOptions}
             invalid={Boolean(errorAt(errors, 'brand'))}
             onChange={(brand) => update((d) => void (d.brand = brand))}
           />

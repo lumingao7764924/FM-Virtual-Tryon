@@ -201,6 +201,29 @@ test('brand and ownership scope', async () => {
   assert.deepEqual(list.json().brands, ['TimePhoria']);
   assert.equal((await call(limited, 'GET', `/api/finders/${theirs.json().finder.id}`)).statusCode, 404);
   assert.equal((await call(limited, 'GET', `/api/finders/${mine.json().finder.id}`)).statusCode, 200);
+
+  const narrowed = await call(boss, 'PUT', '/api/admin/users/limited@example.com', {
+    role: 'editor',
+    brands: ['Glad2Glow'],
+    scope: 'all',
+  });
+  assert.equal(narrowed.statusCode, 200, narrowed.body);
+  const other = await call(boss, 'POST', '/api/finders', { title: 'Boss Glow', brand: 'Glad2Glow' });
+  assert.equal(other.statusCode, 201, other.body);
+
+  const after = await call(limited, 'GET', '/api/finders?pageSize=50');
+  const afterTitles = after.json().items.map((item: { title: string }) => item.title).sort();
+  assert.deepEqual(afterTitles, ['Boss Glow', 'My Time']);
+  assert.deepEqual(after.json().brands, ['Glad2Glow', 'TimePhoria']);
+  assert.equal((await call(limited, 'POST', '/api/finders', { title: 'New Time', brand: 'TimePhoria' })).statusCode, 403);
+  assert.equal((await call(limited, 'GET', `/api/finders/${mine.json().finder.id}`)).statusCode, 200);
+
+  const own = mine.json().finder;
+  const kept = await call(limited, 'PUT', `/api/finders/${own.id}`, { ...own, title: 'My Time kept' });
+  assert.equal(kept.statusCode, 200, kept.body);
+  assert.equal(kept.json().finder.brand, 'TimePhoria');
+  const moved = await call(limited, 'PUT', `/api/finders/${own.id}`, { ...kept.json().finder, brand: 'Skintific' });
+  assert.equal(moved.statusCode, 403);
 });
 
 test('public events ingest', async () => {

@@ -71,7 +71,12 @@ export class FinderService {
       total: filtered.length,
       page,
       pageSize,
-      brands: (access.brands.length > 0 ? [...access.brands] : [...new Set(visible.map((finder) => finder.brand).filter(Boolean))]).sort(),
+      brands: [
+        ...new Set([
+          ...(access.brands.length > 0 ? access.brands : []),
+          ...visible.map((finder) => finder.brand).filter(Boolean),
+        ]),
+      ].sort(),
     };
   }
 
@@ -158,7 +163,8 @@ export class FinderService {
     const current = await this.get(id, access);
     const { value, errors } = normalizeFinderSave({ ...(raw as object), code: current.code });
     if (errors.length) throw badRequest('保存失败：请检查标红的字段', errors);
-    if (access.brands.length > 0 && !access.brands.includes(value.brand)) {
+    const keepsCurrent = value.brand === current.brand;
+    if (access.brands.length > 0 && !access.brands.includes(value.brand) && !keepsCurrent) {
       throw forbidden('不能改到这个品牌');
     }
     if (value.version !== current.version) {
